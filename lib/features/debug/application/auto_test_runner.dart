@@ -254,15 +254,15 @@ class AutoTestRunner {
           'Dynamic day1 copy uyuşmuyor',
         );
         _expect(
-          l10n.dynamicMessage(3) == 'Çoğu kişi 3. günde bırakır.',
+          l10n.dynamicMessage(3) == 'Sen bırakan biri değilsin.',
           'Dynamic day3 copy uyuşmuyor',
         );
         _expect(
-          l10n.dynamicMessage(6) == 'Hala buradasın.',
+          l10n.dynamicMessage(6) == 'Sen bırakan biri değilsin.',
           'Dynamic day6 copy uyuşmuyor',
         );
         _expect(
-          l10n.dynamicMessage(10) == 'Bozma.',
+          l10n.dynamicMessage(10) == 'Artık geri dönüş yok.',
           'Dynamic day10 copy uyuşmuyor',
         );
         _expect(
@@ -277,7 +277,7 @@ class AutoTestRunner {
 
       await runStep('loss_copy_present', () async {
         final l10n = AppLocalizations('tr');
-        _expect(l10n.lossHeadline == 'Bitti.', 'Loss headline uyumsuz');
+        _expect(l10n.lossHeadline == 'Seri bozuldu.', 'Loss headline uyumsuz');
         _expect(
           l10n.lossBody(3) == '3 gün. Gitti.',
           'Loss body uyumsuz',

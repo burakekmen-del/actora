@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/localization/app_localizations.dart';
+import '../core/logging/app_log.dart';
 import '../core/theme/app_theme.dart';
 import '../core/widgets/animated_text.dart';
 import '../features/debug/presentation/debug_shell.dart';
@@ -17,6 +18,14 @@ class ActoraApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final bootstrap = ref.watch(onboardingBootstrapProvider);
     final onboardingCompleted = ref.watch(onboardingCompletedProvider);
+    AppLog.verbose('app.build', details: {
+      'onboarding_completed': onboardingCompleted,
+      'bootstrap_state': bootstrap.when(
+        data: (_) => 'data',
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+      ),
+    });
     final target =
         onboardingCompleted ? const TodayScreen() : const OnboardingScreen();
 
@@ -36,6 +45,9 @@ class ActoraApp extends ConsumerWidget {
       ],
       supportedLocales: const [Locale('en'), Locale('tr')],
       localeResolutionCallback: (locale, supportedLocales) {
+        AppLog.verbose('app.locale_resolution', details: {
+          'requested': locale?.languageCode ?? 'null',
+        });
         if (locale == null) {
           return const Locale('en');
         }
@@ -77,24 +89,33 @@ class _LaunchSequenceScreenState extends State<_LaunchSequenceScreen> {
   @override
   void initState() {
     super.initState();
+    AppLog.flow('launch.sequence', 'init');
     _runSequence();
   }
 
   Future<void> _runSequence() async {
+    AppLog.flow('launch.sequence', 'step_stop_waiting_delay');
     await Future<void>.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
     setState(() {
       _showStopWaiting = true;
     });
+    AppLog.verbose('launch.sequence.stop_waiting_visible');
 
+    AppLog.flow('launch.sequence', 'step_start_delay');
     await Future<void>.delayed(const Duration(milliseconds: 1000));
     if (!mounted) return;
     setState(() {
       _showStart = true;
     });
+    AppLog.verbose('launch.sequence.start_visible');
 
+    AppLog.flow('launch.sequence', 'step_navigate_delay');
     await Future<void>.delayed(const Duration(milliseconds: 380));
     if (!mounted) return;
+    AppLog.action('launch.sequence.navigate_target', details: {
+      'target_widget': widget.target.runtimeType.toString(),
+    });
     Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(
         transitionDuration: const Duration(milliseconds: 220),
@@ -104,6 +125,12 @@ class _LaunchSequenceScreenState extends State<_LaunchSequenceScreen> {
         },
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    AppLog.flow('launch.sequence', 'dispose');
+    super.dispose();
   }
 
   @override

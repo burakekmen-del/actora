@@ -34,19 +34,27 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   @override
   void initState() {
     super.initState();
+    AppLog.flow('share.screen', 'init_state', details: {
+      'streak': widget.streak,
+    });
     _activationTimer = Timer(const Duration(milliseconds: 1200), () {
       if (!mounted) return;
       setState(() {
         _actionsEnabled = true;
       });
+      AppLog.verbose('share.screen.actions_enabled', details: {
+        'streak': widget.streak,
+      });
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppLog.flow('share.screen', 'auto_copy_triggered');
       _copyCurrentText(auto: true, showToast: false);
     });
   }
 
   @override
   void dispose() {
+    AppLog.flow('share.screen', 'dispose');
     _activationTimer?.cancel();
     super.dispose();
   }
@@ -172,7 +180,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                         ),
                         const SizedBox(height: 14),
                         Text(
-                          l10n.shareStatementThirdLine,
+                          l10n.shareLineByStreak(widget.streak),
                           textAlign: TextAlign.center,
                           style:
                               Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -274,6 +282,11 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
 
   Future<void> _copyCurrentText(
       {bool auto = false, bool showToast = true}) async {
+    AppLog.verbose('share.copy.begin', details: {
+      'auto': auto,
+      'show_toast': showToast,
+      'platform': _selectedPlatform.name,
+    });
     final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
     final text = _shareText(l10n, widget.streak, _selectedPlatform);
     if (mounted) {
@@ -294,17 +307,31 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
         SnackBar(content: Text(l10n.shareCopiedToast)),
       );
     }
+    AppLog.verbose('share.copy.completed', details: {
+      'auto': auto,
+      'platform': _selectedPlatform.name,
+    });
   }
 
   Future<void> _sharePosterImage({required String shareText}) async {
+    AppLog.flow('share.poster', 'capture_begin', details: {
+      'platform': _selectedPlatform.name,
+      'streak': widget.streak,
+    });
     final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
     final bytes = await _capturePosterBytes();
 
     if (bytes == null) {
+      AppLog.blocked('share.poster.capture', 'bytes_null', details: {
+        'platform': _selectedPlatform.name,
+      });
       await _copyCurrentText(showToast: true);
       await SharePlus.instance.share(
         ShareParams(text: shareText, subject: 'Actora'),
       );
+      AppLog.action('share.poster.shared_text_only', details: {
+        'platform': _selectedPlatform.name,
+      });
       return;
     }
 
@@ -322,6 +349,10 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
         subject: 'Actora',
       ),
     );
+    AppLog.action('share.poster.shared_with_image', details: {
+      'platform': _selectedPlatform.name,
+      'bytes': bytes.length,
+    });
 
     if (!mounted) {
       return;
@@ -335,6 +366,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     await WidgetsBinding.instance.endOfFrame;
     final renderObject = _posterKey.currentContext?.findRenderObject();
     if (renderObject is! RenderRepaintBoundary) {
+      AppLog.blocked('share.poster.capture', 'boundary_missing');
       return null;
     }
 

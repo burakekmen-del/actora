@@ -49,8 +49,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
   static const int _weeklyGoal = 7;
   String? _doneIdentityMessage;
   String? _doneCuriosityMessage;
-  String? _lastDoneIdentityMessage;
-  String? _lastDoneCuriosityMessage;
 
   List<_GroupBucket> _groupSteps(List<AutoTestStep> steps) {
     const order = <String>['Core', 'Identity', 'Evolution', 'Guard'];
@@ -133,25 +131,33 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
   @override
   void initState() {
     super.initState();
+    AppLog.flow('today.screen', 'init_state');
     _streakPulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 420),
     );
     _startReturnNudgeTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      AppLog.flow('today.screen.bootstrap', 'start');
       final service = ref.read(firestoreServiceProvider);
       await ref
           .read(streakProvider.notifier)
           .hydrateFromServer(firestoreService: service);
       await _refreshWeeklyProgress();
       final savedTask = await service.loadSavedTask();
+      AppLog.verbose('today.screen.bootstrap.saved_task', details: {
+        'exists': savedTask != null,
+        'status': savedTask?.status.name,
+      });
       if (!mounted || savedTask == null) return;
       ref.read(taskControllerProvider.notifier).setTask(savedTask);
+      AppLog.flow('today.screen.bootstrap', 'completed');
     });
   }
 
   @override
   void dispose() {
+    AppLog.flow('today.screen', 'dispose');
     _returnNudgeTimer?.cancel();
     _focusTimer?.cancel();
     _streakPulseController.dispose();
@@ -193,6 +199,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
   }
 
   Future<void> _handleStart() async {
+    AppLog.flow('today.start', 'begin');
     final taskController = ref.read(taskControllerProvider.notifier);
     final analytics = ref.read(analyticsServiceProvider);
     final task = ref.read(taskControllerProvider);
@@ -238,9 +245,13 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
         unawaited(_handleComplete());
       }
     });
+    AppLog.flow('today.start', 'completed', details: {
+      'focus_target_seconds': _focusTargetSeconds,
+    });
   }
 
   Future<void> _handleComplete() async {
+    AppLog.flow('today.complete', 'begin');
     if (_completeLock) return;
     _completeLock = true;
     final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
@@ -269,9 +280,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
       _doneIdentityMessage = l10n.dynamicMessage(
         streakResult.updatedStreakCount,
       );
-      _doneCuriosityMessage = streakResult.updatedStreakCount > 2
-          ? l10n.returnPressureMessage
-          : null;
+      _doneCuriosityMessage = l10n.returnPressureByStreak(
+        streakResult.updatedStreakCount,
+      );
       await analytics.logTaskCompleted();
       if (streakResult.updatedStreakCount == 3) {
         await analytics.logStreakDay3();
@@ -306,13 +317,14 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
     if (mounted && completed) {
       final int updatedStreak =
           streakResult?.updatedStreakCount ?? (ref.read(streakProvider) ?? 0);
-      _lastDoneIdentityMessage = _doneIdentityMessage;
-      _lastDoneCuriosityMessage = _doneCuriosityMessage;
+      AppLog.verbose('today.complete.post_sequence', details: {
+        'updated_streak': updatedStreak,
+      });
       await _showMandatoryDoneExperience(streak: updatedStreak);
       if (!mounted) {
         return;
       }
-      await _showSharePromptAfterDone(streak: updatedStreak);
+      await _openShareAfterDone(streak: updatedStreak);
       if (!mounted) {
         return;
       }
@@ -329,9 +341,13 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
     }
 
     _completeLock = false;
+    AppLog.flow('today.complete', 'completed', details: {
+      'completed': completed,
+    });
   }
 
   Future<void> _handleCannotDo() async {
+    AppLog.flow('today.cannot_do', 'begin');
     final taskController = ref.read(taskControllerProvider.notifier);
     final streakController = ref.read(streakProvider.notifier);
     final firestoreService = ref.read(firestoreServiceProvider);
@@ -366,6 +382,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
     );
 
     if (outcome.type == MissedTaskOutcomeType.freezeUsed) {
+      AppLog.verbose('today.cannot_do.freeze_used', details: {
+        'is_premium': outcome.isPremium,
+      });
       await analytics.logFreezeUsed(isPremium: outcome.isPremium);
       if (mounted) {
         ScaffoldMessenger.of(
@@ -381,8 +400,12 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
 
     if (outcome.type == MissedTaskOutcomeType.streakReset &&
         previousStreak > 0) {
+      AppLog.verbose('today.cannot_do.loss_dialog_shown', details: {
+        'previous_streak': previousStreak,
+      });
       await showDialog<void>(
         context: context,
+        barrierDismissible: false,
         builder: (context) {
           return AlertDialog(
             title: Text(l10n.lossHeadline),
@@ -404,6 +427,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(l10n.streakReset)));
+    AppLog.flow('today.cannot_do', 'completed', details: {
+      'outcome': outcome.type.name,
+    });
   }
 
   Future<void> _persistCurrentTask() async {
@@ -435,6 +461,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
   }
 
   Future<void> _showPostCompleteLoop({required int streak}) async {
+    AppLog.flow('today.post_complete_loop', 'open',
+        details: {'streak': streak});
     final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
     final selection = await showModalBottomSheet<String>(
       context: context,
@@ -459,13 +487,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
                   l10n.dynamicMessage(streak),
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
-                if (streak > 2) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    l10n.returnPressureMessage,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
+                const SizedBox(height: 4),
+                Text(
+                  l10n.returnPressureByStreak(streak),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 const SizedBox(height: 14),
                 OutlinedButton(
                   onPressed: () => Navigator.of(context).pop('tomorrow'),
@@ -488,6 +514,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
     }
 
     if (selection == 'share') {
+      AppLog.verbose('today.post_complete_loop.selection', details: {
+        'selection': selection,
+      });
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => ShareScreen(streak: streak),
@@ -496,64 +525,15 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
     }
   }
 
-  Future<void> _showSharePromptAfterDone({required int streak}) async {
+  Future<void> _openShareAfterDone({required int streak}) async {
+    AppLog.flow('today.share_after_done', 'open', details: {'streak': streak});
     if (!mounted) {
       return;
     }
-    final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
-    final analytics = ref.read(analyticsServiceProvider);
-    await analytics.logShareOpened();
+    await ref.read(analyticsServiceProvider).logShareOpened();
     if (!mounted) {
       return;
     }
-    final canAct = ValueNotifier<bool>(false);
-    var canActDisposed = false;
-    final timer = Timer(const Duration(milliseconds: 1500), () {
-      if (!canActDisposed) {
-        canAct.value = true;
-      }
-    });
-    final selection = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(l10n.shareNudgeTitle),
-          content: Text(l10n.shareNudgeBodyByStreak(streak)),
-          actions: [
-            ValueListenableBuilder<bool>(
-              valueListenable: canAct,
-              builder: (context, enabled, _) {
-                return TextButton(
-                  onPressed: enabled
-                      ? () => Navigator.of(context).pop('continue')
-                      : null,
-                  child: Text(l10n.shareContinueLabel),
-                );
-              },
-            ),
-            ValueListenableBuilder<bool>(
-              valueListenable: canAct,
-              builder: (context, enabled, _) {
-                return FilledButton(
-                  onPressed:
-                      enabled ? () => Navigator.of(context).pop('share') : null,
-                  child: Text(l10n.shareLabel),
-                );
-              },
-            ),
-          ],
-        );
-      },
-    );
-    timer.cancel();
-    canActDisposed = true;
-    canAct.dispose();
-
-    if (!mounted || selection != 'share') {
-      return;
-    }
-
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ShareScreen(streak: streak),
@@ -562,12 +542,16 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
   }
 
   Future<void> _showMandatoryDoneExperience({required int streak}) async {
+    AppLog.flow('today.done_experience', 'open', details: {'streak': streak});
     final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
-    final showSecondary = ValueNotifier<bool>(false);
-    final revealTimer = Timer(const Duration(milliseconds: 800), () {
-      showSecondary.value = true;
+    final stage = ValueNotifier<int>(0);
+    final firstReveal = Timer(const Duration(milliseconds: 500), () {
+      stage.value = 1;
     });
-    final closeTimer = Timer(const Duration(milliseconds: 2600), () {
+    final secondReveal = Timer(const Duration(milliseconds: 1300), () {
+      stage.value = 2;
+    });
+    final closeTimer = Timer(const Duration(milliseconds: 2800), () {
       if (!mounted) {
         return;
       }
@@ -603,37 +587,37 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
                               ?.copyWith(color: Colors.white),
                         ),
                         const SizedBox(height: 12),
-                        ValueListenableBuilder<bool>(
-                          valueListenable: showSecondary,
-                          builder: (context, visible, _) {
-                            return AnimatedOpacity(
-                              duration: const Duration(milliseconds: 180),
-                              opacity: visible ? 1 : 0,
-                              child: Column(
-                                children: [
-                                  Text(
-                                    _lastDoneIdentityMessage ??
-                                        l10n.dynamicMessage(streak),
+                        ValueListenableBuilder<int>(
+                          valueListenable: stage,
+                          builder: (context, value, _) {
+                            return Column(
+                              children: [
+                                AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 180),
+                                  opacity: value >= 1 ? 1 : 0,
+                                  child: Text(
+                                    l10n.doneMomentLineTwo,
                                     textAlign: TextAlign.center,
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleMedium
                                         ?.copyWith(color: Colors.white70),
                                   ),
-                                  if ((_lastDoneCuriosityMessage ?? '')
-                                      .isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      _lastDoneCuriosityMessage!,
-                                      textAlign: TextAlign.center,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(color: Colors.white54),
-                                    ),
-                                  ],
-                                ],
-                              ),
+                                ),
+                                const SizedBox(height: 8),
+                                AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 180),
+                                  opacity: value >= 2 ? 1 : 0,
+                                  child: Text(
+                                    l10n.doneMomentLineThree,
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.copyWith(color: Colors.white54),
+                                  ),
+                                ),
+                              ],
                             );
                           },
                         ),
@@ -650,12 +634,15 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
         return FadeTransition(opacity: animation, child: child);
       },
     );
-    revealTimer.cancel();
+    firstReveal.cancel();
+    secondReveal.cancel();
     closeTimer.cancel();
-    showSecondary.dispose();
+    stage.dispose();
+    AppLog.flow('today.done_experience', 'closed', details: {'streak': streak});
   }
 
   Future<void> _showHookMoment() async {
+    AppLog.flow('today.hook_moment', 'open');
     final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
     await showDialog<void>(
       context: context,
@@ -687,9 +674,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
         );
       },
     );
+    AppLog.flow('today.hook_moment', 'closed');
   }
 
   Future<void> _runFullTestFromToday() async {
+    AppLog.flow('today.auto_test', 'begin');
     if (!kDebugMode || _runningFullTest) {
       return;
     }
@@ -738,6 +727,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
           );
         },
       );
+      AppLog.flow('today.auto_test', 'completed', details: {
+        'total': result.totalSteps,
+        'success': result.successCount,
+        'failed': result.failCount,
+      });
     } finally {
       if (mounted) {
         setState(() {
@@ -1127,7 +1121,15 @@ class _TaskCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    l10n.unfinishedPressure,
+                    l10n.unfinishedPressurePrimary,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    l10n.unfinishedPressureSecondary,
                     style: Theme.of(context)
                         .textTheme
                         .bodyMedium
@@ -1175,14 +1177,12 @@ class _DoneSequence extends StatelessWidget {
             visible: showSecondary,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
-          if (streak > 2) ...[
-            const SizedBox(height: 4),
-            AnimatedText(
-              text: curiosityMessage ?? l10n.returnPressureMessage,
-              visible: showSecondary,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
+          const SizedBox(height: 4),
+          AnimatedText(
+            text: curiosityMessage ?? l10n.returnPressureByStreak(streak),
+            visible: showSecondary,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ],
       ),
     );
@@ -1228,7 +1228,7 @@ class _PressScaleState extends State<_PressScale> {
       },
       child: AnimatedScale(
         duration: const Duration(milliseconds: 110),
-        scale: _pressed ? 0.985 : 1,
+        scale: _pressed ? 0.96 : 1,
         child: widget.child,
       ),
     );

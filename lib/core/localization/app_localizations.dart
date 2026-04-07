@@ -57,8 +57,15 @@ class AppLocalizations {
 
   String get done => isTurkish ? 'Bitti.' : 'Done.';
 
-  String get unfinishedPressure =>
-      isTurkish ? 'Bitmedi. Yap.' : 'Not done. Do it.';
+  String get unfinishedPressurePrimary => isTurkish ? 'Bitmedi.' : 'Not done.';
+
+  String get unfinishedPressureSecondary => isTurkish ? 'Yap.' : 'Do it.';
+
+  String get doneMomentLineTwo =>
+      isTurkish ? 'Çoğu kişi burada bırakır.' : 'Most people stop here.';
+
+  String get doneMomentLineThree =>
+      isTurkish ? 'Sen bırakmadın.' : 'You didn\'t quit.';
 
   String get doOneMorePrompt =>
       isTurkish ? 'Devam etmek ister misin?' : 'Do you want to keep going?';
@@ -108,14 +115,15 @@ class AppLocalizations {
   }
 
   String dynamicMessage(int streak) {
-    if (streak >= 10) {
-      return isTurkish ? 'Bozma.' : 'Don\'t break it.';
-    }
-    if (streak >= 6) {
-      return isTurkish ? 'Hala buradasın.' : 'You\'re still here.';
+    if (streak >= 7) {
+      return isTurkish
+          ? 'Artık geri dönüş yok.'
+          : 'There is no going back now.';
     }
     if (streak >= 3) {
-      return socialPressureMessage(streak);
+      return isTurkish
+          ? 'Sen bırakan biri değilsin.'
+          : 'You are not someone who quits.';
     }
     if (streak >= 2) {
       return isTurkish ? 'Devam et.' : 'Keep going.';
@@ -126,6 +134,20 @@ class AppLocalizations {
   String get returnPressureMessage => isTurkish
       ? 'Yarın yapmazsan sıfırlanır.'
       : 'If you miss tomorrow, it resets.';
+
+  String returnPressureByStreak(int streak) {
+    if (streak >= 7) {
+      return isTurkish
+          ? 'Yarın gelmezsen sıfırlanır. Artık geri dönüş yok.'
+          : 'If you miss tomorrow, it resets. There is no going back now.';
+    }
+    if (streak >= 3) {
+      return isTurkish
+          ? 'Yarın gelmezsen sıfırlanır. Sen bırakan biri değilsin.'
+          : 'If you miss tomorrow, it resets. You are not someone who quits.';
+    }
+    return returnPressureMessage;
+  }
 
   String curiosityLoopMessage(int streak) {
     if (streak >= 7) {
@@ -141,9 +163,9 @@ class AppLocalizations {
       return isTurkish ? 'Tekrar başla.' : 'Start again.';
     }
     if (isTurkish) {
-      return '$previousStreak gündür yapıyordun.';
+      return '$previousStreak gün. Gitti.';
     }
-    return 'You had $previousStreak days going.';
+    return '$previousStreak days. Gone.';
   }
 
   String get shareLabel => isTurkish ? 'Paylaş' : 'Share';
