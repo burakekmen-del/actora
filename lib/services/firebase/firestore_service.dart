@@ -38,6 +38,8 @@ class FirestoreService {
   static const String _premiumUpdatedAtKey = 'premium_updated_at';
   static const String _createdAtKey = 'created_at';
   static const String _currentTaskKey = 'current_task';
+  static const String _lastTaskAssignedLocalDateKey =
+      'last_task_assigned_local_date';
   static const String _weeklyCompletedCountKey = 'weekly_completed_count';
   static const String _weeklyAnchorLocalDateKey = 'weekly_anchor_local_date';
 
@@ -191,6 +193,24 @@ class FirestoreService {
     return _saveTaskToPrefs(task);
   }
 
+  Future<bool> hasCompletedTaskToday() async {
+    final prefs = await _prefs;
+    final today = _dateKey(DateTime.now());
+    return prefs.getString(_lastTaskCompletionLocalDateKey) == today;
+  }
+
+  Future<bool> hasAssignedTaskToday() async {
+    final prefs = await _prefs;
+    final today = _dateKey(DateTime.now());
+    return prefs.getString(_lastTaskAssignedLocalDateKey) == today;
+  }
+
+  Future<void> markTaskAssignedToday() async {
+    final prefs = await _prefs;
+    await prefs.setString(
+        _lastTaskAssignedLocalDateKey, _dateKey(DateTime.now()));
+  }
+
   Future<void> clearSavedTask() async {
     final prefs = await _prefs;
     await prefs.remove(_currentTaskKey);
@@ -324,6 +344,8 @@ class FirestoreService {
   Future<void> _saveTaskToPrefs(Task task) async {
     final prefs = await _prefs;
     await prefs.setString(_currentTaskKey, jsonEncode(task.toMap()));
+    await prefs.setString(
+        _lastTaskAssignedLocalDateKey, _dateKey(DateTime.now()));
   }
 
   DateTime? _parseDateTime(String? raw) {

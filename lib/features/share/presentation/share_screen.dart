@@ -29,6 +29,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   bool _didAutoCopy = false;
   bool _isCopying = false;
   bool _actionsEnabled = false;
+  bool _shareClicked = false;
   Timer? _activationTimer;
 
   @override
@@ -37,6 +38,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     AppLog.flow('share.screen', 'init_state', details: {
       'streak': widget.streak,
     });
+    unawaited(ref.read(analyticsServiceProvider).logShareScreenShown());
     _activationTimer = Timer(const Duration(milliseconds: 1200), () {
       if (!mounted) return;
       setState(() {
@@ -54,6 +56,10 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
 
   @override
   void dispose() {
+    if (!_shareClicked) {
+      unawaited(
+          ref.read(analyticsServiceProvider).logShareClosedWithoutShare());
+    }
     AppLog.flow('share.screen', 'dispose');
     _activationTimer?.cancel();
     super.dispose();
@@ -219,6 +225,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                 onPressed: _actionsEnabled
                     ? () async {
                         final analytics = ref.read(analyticsServiceProvider);
+                        _shareClicked = true;
                         AppLog.action('share_screen.share_tapped', details: {
                           'streak': widget.streak,
                           'platform': _selectedPlatform.name,
@@ -307,6 +314,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
         SnackBar(content: Text(l10n.shareCopiedToast)),
       );
     }
+    unawaited(ref.read(analyticsServiceProvider).logShareCopied());
     AppLog.verbose('share.copy.completed', details: {
       'auto': auto,
       'platform': _selectedPlatform.name,

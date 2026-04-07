@@ -38,8 +38,28 @@ class AnalyticsService {
     return _safeLog(name: 'share_opened');
   }
 
+  Future<void> logShareScreenShown() {
+    return _safeLog(name: 'share_screen_shown');
+  }
+
   Future<void> logShareClicked() {
     return _safeLog(name: 'share_clicked');
+  }
+
+  Future<void> logShareClosedWithoutShare() {
+    return _safeLog(name: 'share_closed_without_share');
+  }
+
+  Future<void> logShareCopied() {
+    return _safeLog(name: 'share_copied');
+  }
+
+  Future<void> logDoneExperienceShown() {
+    return _safeLog(name: 'done_experience_shown');
+  }
+
+  Future<void> logReturnedNextDay() {
+    return _safeLog(name: 'returned_next_day');
   }
 
   Future<void> logStreakDay3() {

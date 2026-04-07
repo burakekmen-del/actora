@@ -10,13 +10,16 @@ import '../../../core/logging/app_log.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/animated_text.dart';
 import '../../../core/widgets/impact_overlay.dart';
+import '../../dashboard/application/execution_day_gate.dart';
 import '../../debug/application/auto_test_runner.dart';
 import '../../debug/application/debug_controller.dart';
 import '../../debug/domain/auto_test_result.dart';
 import '../../debug/domain/auto_test_step.dart';
+import '../../onboarding/domain/onboarding_models.dart';
 import '../../../services/analytics/analytics_service.dart';
 import '../../../services/firebase/firestore_service.dart';
 import '../../streak/application/streak_controller.dart';
+import '../../task/application/first_task_factory.dart';
 import '../../task/application/task_controller.dart';
 import '../../task/domain/task.dart';
 import '../../share/presentation/share_screen.dart';
@@ -47,6 +50,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
   bool _runningFullTest = false;
   int _weeklyCompleted = 0;
   static const int _weeklyGoal = 7;
+  ExecutionDayState _executionDayState = ExecutionDayState.noTaskToday;
   String? _doneIdentityMessage;
   String? _doneCuriosityMessage;
 
@@ -139,18 +143,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
     _startReturnNudgeTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       AppLog.flow('today.screen.bootstrap', 'start');
-      final service = ref.read(firestoreServiceProvider);
-      await ref
-          .read(streakProvider.notifier)
-          .hydrateFromServer(firestoreService: service);
-      await _refreshWeeklyProgress();
-      final savedTask = await service.loadSavedTask();
-      AppLog.verbose('today.screen.bootstrap.saved_task', details: {
-        'exists': savedTask != null,
-        'status': savedTask?.status.name,
-      });
-      if (!mounted || savedTask == null) return;
-      ref.read(taskControllerProvider.notifier).setTask(savedTask);
+      await _resolveExecutionDayGate();
       AppLog.flow('today.screen.bootstrap', 'completed');
     });
   }
@@ -198,6 +191,157 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
     });
   }
 
+  bool _isSameLocalDay(DateTime left, DateTime right) {
+    return left.year == right.year &&
+        left.month == right.month &&
+        left.day == right.day;
+  }
+
+  Future<void> _resolveExecutionDayGate() async {
+    final service = ref.read(firestoreServiceProvider);
+    final taskController = ref.read(taskControllerProvider.notifier);
+
+    await ref
+        .read(streakProvider.notifier)
+        .hydrateFromServer(firestoreService: service);
+    await _refreshWeeklyProgress();
+
+    final savedTask = await service.loadSavedTask();
+    final completedToday = await service.hasCompletedTaskToday();
+    final assignedToday = await service.hasAssignedTaskToday();
+
+    AppLog.verbose('today.gate.snapshot', details: {
+      'saved_task': savedTask != null,
+      'saved_status': savedTask?.status.name,
+      'completed_today': completedToday,
+      'assigned_today': assignedToday,
+    });
+
+    if (!mounted) {
+      return;
+    }
+
+    if (savedTask != null &&
+        savedTask.status == TaskStatus.inProgress &&
+        !_isSameLocalDay(savedTask.createdAt, DateTime.now())) {
+      await _handleStaleInProgressTask(savedTask);
+      return;
+    }
+
+    if (completedToday) {
+      taskController.clearTask();
+      setState(() {
+        _executionDayState = ExecutionDayState.completedToday;
+      });
+      return;
+    }
+
+    if (savedTask != null) {
+      taskController.setTask(savedTask);
+      setState(() {
+        _executionDayState = ExecutionDayState.activeTask;
+      });
+      return;
+    }
+
+    if (!assignedToday) {
+      await _generateDailyTask();
+      return;
+    }
+
+    setState(() {
+      _executionDayState = ExecutionDayState.noTaskToday;
+    });
+  }
+
+  Future<void> _generateDailyTask() async {
+    final service = ref.read(firestoreServiceProvider);
+    final localeCode = Localizations.localeOf(context).languageCode;
+    final focus = await service.loadSelectedFocus() ?? UserFocus.focus;
+    final duration =
+        await service.loadPreferredDuration() ?? PreferredDuration.twoMin;
+    final streakDay = ref.read(streakProvider) + 1;
+
+    final task = FirstTaskFactory.create(
+      focus: focus,
+      preferredDuration: duration,
+      languageCode: localeCode,
+      streakDay: streakDay,
+    );
+
+    await service.saveTask(userId: 'local', task: task);
+    ref.read(taskControllerProvider.notifier).setTask(task);
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _executionDayState = ExecutionDayState.activeTask;
+    });
+    AppLog.action('today.gate.daily_task_generated', details: {
+      'title': task.title,
+      'streak_day': streakDay,
+    });
+  }
+
+  Future<void> _handleStaleInProgressTask(Task staleTask) async {
+    final taskController = ref.read(taskControllerProvider.notifier);
+    final streakController = ref.read(streakProvider.notifier);
+    final service = ref.read(firestoreServiceProvider);
+    final analytics = ref.read(analyticsServiceProvider);
+    final previousStreak = ref.read(streakProvider);
+
+    AppLog.action('today.gate.stale_task_detected', details: {
+      'title': staleTask.title,
+      'created_at': staleTask.createdAt.toIso8601String(),
+      'previous_streak': previousStreak,
+    });
+
+    final outcome = await streakController.processMissedTask(
+      firestoreService: service,
+    );
+    await service.clearSavedTask();
+    taskController.clearTask();
+
+    if (outcome.type == MissedTaskOutcomeType.freezeUsed) {
+      await analytics.logFreezeUsed(isPremium: outcome.isPremium);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _executionDayState = ExecutionDayState.noTaskToday;
+      });
+      return;
+    }
+
+    if (mounted && previousStreak > 0) {
+      final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return AlertDialog(
+            title: Text(l10n.lossHeadline),
+            content: Text(l10n.lossBody(previousStreak)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(l10n.continueLabel),
+              ),
+            ],
+          );
+        },
+      );
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _executionDayState = ExecutionDayState.missedToday;
+    });
+  }
+
   Future<void> _handleStart() async {
     AppLog.flow('today.start', 'begin');
     final taskController = ref.read(taskControllerProvider.notifier);
@@ -219,6 +363,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
     setState(() {
       _focusSeconds = 0;
       _showFocusOverlay = true;
+      _executionDayState = ExecutionDayState.activeTask;
     });
     _focusTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted || !_showFocusOverlay) {
@@ -325,10 +470,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
         return;
       }
       await _openShareAfterDone(streak: updatedStreak);
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(() {
+          _executionDayState = ExecutionDayState.completedToday;
+        });
       }
-      await _showPostCompleteLoop(streak: updatedStreak);
     }
 
     if (mounted) {
@@ -372,6 +518,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
       AppLog.blocked('ui.today.cannot_do', 'invalid_transition');
       return;
     }
+
     await analytics.logCannotDo();
     await analytics.logTaskCannotDo();
     await _clearSavedTask();
@@ -387,6 +534,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
       });
       await analytics.logFreezeUsed(isPremium: outcome.isPremium);
       if (mounted) {
+        setState(() {
+          _executionDayState = ExecutionDayState.noTaskToday;
+        });
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(l10n.streakSavedDontWasteIt)));
@@ -427,6 +577,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(l10n.streakReset)));
+    if (mounted) {
+      setState(() {
+        _executionDayState = ExecutionDayState.missedToday;
+      });
+    }
     AppLog.flow('today.cannot_do', 'completed', details: {
       'outcome': outcome.type.name,
     });
@@ -460,71 +615,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
     });
   }
 
-  Future<void> _showPostCompleteLoop({required int streak}) async {
-    AppLog.flow('today.post_complete_loop', 'open',
-        details: {'streak': streak});
-    final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
-    final selection = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: AppTheme.surfaceAlt,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  l10n.doOneMorePrompt,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  l10n.dynamicMessage(streak),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  l10n.returnPressureByStreak(streak),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 14),
-                OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop('tomorrow'),
-                  child: Text(l10n.continueTomorrowLabel),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop('share'),
-                  child: Text(l10n.shareLabel),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    if (selection == 'share') {
-      AppLog.verbose('today.post_complete_loop.selection', details: {
-        'selection': selection,
-      });
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => ShareScreen(streak: streak),
-        ),
-      );
-    }
-  }
-
   Future<void> _openShareAfterDone({required int streak}) async {
     AppLog.flow('today.share_after_done', 'open', details: {'streak': streak});
     if (!mounted) {
@@ -544,14 +634,19 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
   Future<void> _showMandatoryDoneExperience({required int streak}) async {
     AppLog.flow('today.done_experience', 'open', details: {'streak': streak});
     final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
+    await ref.read(analyticsServiceProvider).logDoneExperienceShown();
+    if (!mounted) {
+      return;
+    }
     final stage = ValueNotifier<int>(0);
     final firstReveal = Timer(const Duration(milliseconds: 500), () {
       stage.value = 1;
     });
     final secondReveal = Timer(const Duration(milliseconds: 1300), () {
       stage.value = 2;
+      HapticFeedback.heavyImpact();
     });
-    final closeTimer = Timer(const Duration(milliseconds: 2800), () {
+    final closeTimer = Timer(const Duration(milliseconds: 2700), () {
       if (!mounted) {
         return;
       }
@@ -746,6 +841,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
     final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
     final streak = ref.watch(streakProvider);
     final task = ref.watch(taskControllerProvider);
+    final gateState = _executionDayState;
 
     if (streak != _previousStreak) {
       final shouldPulse =
@@ -806,6 +902,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
                   flex: 7,
                   child: _TaskCard(
                     task: task,
+                    gateState: gateState,
                     collapsing: _showDonePrimary,
                     l10n: l10n,
                     streak: streak,
@@ -833,7 +930,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.end,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: task != null
+                            children: task != null &&
+                                    gateState == ExecutionDayState.activeTask
                                 ? [
                                     _PressScale(
                                       child: ElevatedButton(
@@ -899,6 +997,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
                                           if (mounted) {
                                             setState(() {
                                               _showFocusOverlay = false;
+                                              _executionDayState =
+                                                  ExecutionDayState.noTaskToday;
                                             });
                                           }
                                         },
@@ -925,22 +1025,28 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
                                       child: OutlinedButton(
                                         onPressed: () {},
                                         child: Text(
-                                          '⏳ ${l10n.continueTomorrowLabel}',
+                                          gateState ==
+                                                  ExecutionDayState
+                                                      .completedToday
+                                              ? '⏳ ${l10n.continueTomorrowLabel}'
+                                              : '⏳ ${l10n.comeBackTomorrow}',
                                         ),
                                       ),
                                     ),
                                     const SizedBox(height: 8),
-                                    TextButton(
-                                      onPressed: () async {
-                                        await Navigator.of(context).push(
-                                          MaterialPageRoute<void>(
-                                            builder: (_) =>
-                                                ShareScreen(streak: streak),
-                                          ),
-                                        );
-                                      },
-                                      child: Text('🚀 ${l10n.shareLabel}'),
-                                    ),
+                                    if (gateState ==
+                                        ExecutionDayState.completedToday)
+                                      TextButton(
+                                        onPressed: () async {
+                                          await Navigator.of(context).push(
+                                            MaterialPageRoute<void>(
+                                              builder: (_) =>
+                                                  ShareScreen(streak: streak),
+                                            ),
+                                          );
+                                        },
+                                        child: Text('🚀 ${l10n.shareLabel}'),
+                                      ),
                                   ],
                           ),
                         ),
@@ -1063,12 +1169,14 @@ class _StreakBar extends StatelessWidget {
 class _TaskCard extends StatelessWidget {
   const _TaskCard({
     required this.task,
+    required this.gateState,
     required this.collapsing,
     required this.l10n,
     required this.streak,
   });
 
   final Task? task;
+  final ExecutionDayState gateState;
   final bool collapsing;
   final AppLocalizations l10n;
   final int streak;
@@ -1093,13 +1201,17 @@ class _TaskCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      l10n.doneIdlePrimary(streak),
+                      gateState == ExecutionDayState.missedToday
+                          ? l10n.lossHeadline
+                          : l10n.doneIdlePrimary(streak),
                       style: Theme.of(context).textTheme.headlineSmall,
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      l10n.doneIdleSecondary(streak),
+                      gateState == ExecutionDayState.missedToday
+                          ? l10n.lossBody(streak)
+                          : l10n.doneIdleSecondary(streak),
                       style: Theme.of(context).textTheme.bodyLarge,
                       textAlign: TextAlign.center,
                     ),

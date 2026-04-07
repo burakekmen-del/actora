@@ -218,7 +218,7 @@ class AutoTestRunner {
           'Day7 kimlik mesajı uyuşmuyor',
         );
         _expect(
-          l10n.identityDoneMessage(14) == 'Kontrol sende.',
+          l10n.identityDoneMessage(14) == 'Artık geri dönüş yok.',
           'Day14 kimlik mesajı uyuşmuyor',
         );
       });

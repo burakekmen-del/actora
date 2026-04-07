@@ -263,7 +263,9 @@ class AppLocalizations {
 
   String identityDoneMessage(int streak) {
     if (streak >= 14) {
-      return isTurkish ? 'Kontrol sende.' : 'You are in control.';
+      return isTurkish
+          ? 'Artık geri dönüş yok.'
+          : 'There is no going back now.';
     }
     if (streak >= 7) {
       return isTurkish

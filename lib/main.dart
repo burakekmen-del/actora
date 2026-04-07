@@ -23,6 +23,7 @@ Future<void> main() async {
   });
   if (appOpenResult.isDay2Return) {
     await analyticsService.logAppOpenDay2();
+    await analyticsService.logReturnedNextDay();
   }
 
   AppLog.flow('runtime.bootstrap', 'completed');
