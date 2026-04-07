@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function forbiddenUserFieldsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'consistencyModeActive',
+        'premiumExpiryDate',
+        'premiumUpdatedAt',
+        'freezeCount'
+      ]);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && !request.resource.data.keys().hasAny([
+          'consistencyModeActive',
+          'premiumExpiryDate',
+          'premiumUpdatedAt',
+          'freezeCount'
+        ]);
+      allow update: if isOwner(userId) && !forbiddenUserFieldsChanged();
+      allow delete: if false;
+
+      match /tasks/{taskId} {
+        allow read, create, update, delete: if isOwner(userId);
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
