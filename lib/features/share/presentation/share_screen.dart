@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -27,13 +28,27 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   SharePlatform _selectedPlatform = SharePlatform.x;
   bool _didAutoCopy = false;
   bool _isCopying = false;
+  bool _actionsEnabled = false;
+  Timer? _activationTimer;
 
   @override
   void initState() {
     super.initState();
+    _activationTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (!mounted) return;
+      setState(() {
+        _actionsEnabled = true;
+      });
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _copyCurrentText(auto: true, showToast: false);
     });
+  }
+
+  @override
+  void dispose() {
+    _activationTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -54,7 +69,9 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: _actionsEnabled
+                      ? () => Navigator.of(context).pop()
+                      : null,
                   icon: const Icon(Icons.close, color: Colors.white),
                 ),
               ),
@@ -70,12 +87,14 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                       showCheckmark: false,
                       selected: _selectedPlatform == platform,
                       label: Text(_platformLabel(l10n, platform)),
-                      onSelected: (_) async {
-                        setState(() {
-                          _selectedPlatform = platform;
-                        });
-                        await _copyCurrentText(showToast: false);
-                      },
+                      onSelected: _actionsEnabled
+                          ? (_) async {
+                              setState(() {
+                                _selectedPlatform = platform;
+                              });
+                              await _copyCurrentText(showToast: false);
+                            }
+                          : null,
                     ),
                 ],
               ),
@@ -189,20 +208,24 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
               ),
               const SizedBox(height: 18),
               FilledButton(
-                onPressed: () async {
-                  final analytics = ref.read(analyticsServiceProvider);
-                  AppLog.action('share_screen.share_tapped', details: {
-                    'streak': widget.streak,
-                    'platform': _selectedPlatform.name,
-                  });
-                  await analytics.logShareClicked();
-                  await _sharePosterImage(shareText: shareText);
-                },
+                onPressed: _actionsEnabled
+                    ? () async {
+                        final analytics = ref.read(analyticsServiceProvider);
+                        AppLog.action('share_screen.share_tapped', details: {
+                          'streak': widget.streak,
+                          'platform': _selectedPlatform.name,
+                        });
+                        await analytics.logShareClicked();
+                        await _sharePosterImage(shareText: shareText);
+                      }
+                    : null,
                 child: Text(l10n.shareLabel),
               ),
               const SizedBox(height: 10),
               OutlinedButton(
-                onPressed: _isCopying ? null : () => _copyCurrentText(),
+                onPressed: !_actionsEnabled || _isCopying
+                    ? null
+                    : () => _copyCurrentText(),
                 child: Text(l10n.shareCopyButton),
               ),
               const SizedBox(height: 12),
@@ -246,7 +269,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     int streak,
     SharePlatform platform,
   ) {
-    return '${_streakLabel(l10n, streak)}.\n${l10n.shareScreenStillGoing}\n\n${l10n.shareStatementThirdLine}\n\n${l10n.shareScreenActora}';
+    return '${_streakLabel(l10n, streak)}.\n${l10n.shareScreenStillGoing}\n\n${l10n.shareLineByStreak(streak)}\n\n${l10n.shareScreenActora}';
   }
 
   Future<void> _copyCurrentText(

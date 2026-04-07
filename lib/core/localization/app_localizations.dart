@@ -57,6 +57,9 @@ class AppLocalizations {
 
   String get done => isTurkish ? 'Bitti.' : 'Done.';
 
+  String get unfinishedPressure =>
+      isTurkish ? 'Bitmedi. Yap.' : 'Not done. Do it.';
+
   String get doOneMorePrompt =>
       isTurkish ? 'Devam etmek ister misin?' : 'Do you want to keep going?';
 
@@ -76,7 +79,9 @@ class AppLocalizations {
       return isTurkish ? 'Yarın devam et.' : 'Continue tomorrow.';
     }
     if (streak >= 3) {
-      return isTurkish ? 'Çoğu kişi burada bırakır.' : 'Most people stop here.';
+      return isTurkish
+          ? 'Yarın gelmezsen sıfırlanır. Çoğu kişi burada bırakır.'
+          : 'If you miss tomorrow, it resets. Most people stop here.';
     }
     return isTurkish
         ? 'Yarın gelmezsen sıfırlanır.'
@@ -162,6 +167,15 @@ class AppLocalizations {
     return shareNudgeBody;
   }
 
+  String shareLineByStreak(int streak) {
+    if (streak >= 3) {
+      return isTurkish
+          ? 'Çoğu kişi başarısız olur. Sen olmadın.'
+          : 'Most people fail. You didn\'t.';
+    }
+    return isTurkish ? 'Çoğu kişi bırakır.' : 'Most people quit.';
+  }
+
   String get shareContinueLabel => isTurkish ? 'Devam et' : 'Continue';
 
   String get shareScreenDayLabel => isTurkish ? 'Gün' : 'Day';
@@ -170,7 +184,7 @@ class AppLocalizations {
       isTurkish ? 'Devam ediyorum.' : 'Still going.';
 
   String get shareStatementThirdLine =>
-      isTurkish ? 'Çoğu kişi çoktan bıraktı.' : 'Most people quit already.';
+      isTurkish ? 'Çoğu kişi bırakır.' : 'Most people quit.';
 
   String get shareStatementFootnote => "You wouldn't get it.";
 

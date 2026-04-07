@@ -49,6 +49,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
   static const int _weeklyGoal = 7;
   String? _doneIdentityMessage;
   String? _doneCuriosityMessage;
+  String? _lastDoneIdentityMessage;
+  String? _lastDoneCuriosityMessage;
 
   List<_GroupBucket> _groupSteps(List<AutoTestStep> steps) {
     const order = <String>['Core', 'Identity', 'Evolution', 'Guard'];
@@ -301,11 +303,15 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
       await _showHookMoment();
     }
 
-    await Future<void>.delayed(const Duration(milliseconds: 1600));
-
     if (mounted && completed) {
       final int updatedStreak =
           streakResult?.updatedStreakCount ?? (ref.read(streakProvider) ?? 0);
+      _lastDoneIdentityMessage = _doneIdentityMessage;
+      _lastDoneCuriosityMessage = _doneCuriosityMessage;
+      await _showMandatoryDoneExperience(streak: updatedStreak);
+      if (!mounted) {
+        return;
+      }
       await _showSharePromptAfterDone(streak: updatedStreak);
       if (!mounted) {
         return;
@@ -553,6 +559,100 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
         builder: (_) => ShareScreen(streak: streak),
       ),
     );
+  }
+
+  Future<void> _showMandatoryDoneExperience({required int streak}) async {
+    final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
+    final showSecondary = ValueNotifier<bool>(false);
+    final revealTimer = Timer(const Duration(milliseconds: 800), () {
+      showSecondary.value = true;
+    });
+    final closeTimer = Timer(const Duration(milliseconds: 2600), () {
+      if (!mounted) {
+        return;
+      }
+      final nav = Navigator.of(context, rootNavigator: true);
+      if (nav.canPop()) {
+        nav.pop();
+      }
+    });
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierLabel: 'done_experience',
+      barrierColor: Colors.black87,
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (_, __, ___) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Scaffold(
+              backgroundColor: Colors.black,
+              body: SafeArea(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          l10n.done,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context)
+                              .textTheme
+                              .displaySmall
+                              ?.copyWith(color: Colors.white),
+                        ),
+                        const SizedBox(height: 12),
+                        ValueListenableBuilder<bool>(
+                          valueListenable: showSecondary,
+                          builder: (context, visible, _) {
+                            return AnimatedOpacity(
+                              duration: const Duration(milliseconds: 180),
+                              opacity: visible ? 1 : 0,
+                              child: Column(
+                                children: [
+                                  Text(
+                                    _lastDoneIdentityMessage ??
+                                        l10n.dynamicMessage(streak),
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(color: Colors.white70),
+                                  ),
+                                  if ((_lastDoneCuriosityMessage ?? '')
+                                      .isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      _lastDoneCuriosityMessage!,
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(color: Colors.white54),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+      transitionBuilder: (_, animation, __, child) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+    );
+    revealTimer.cancel();
+    closeTimer.cancel();
+    showSecondary.dispose();
   }
 
   Future<void> _showHookMoment() async {
@@ -1024,6 +1124,14 @@ class _TaskCard extends StatelessWidget {
                   Text(
                     l10n.minutesLabel(task!.estimatedMinutes),
                     style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    l10n.unfinishedPressure,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: Colors.white70),
                   ),
                 ],
               ),
