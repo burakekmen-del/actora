@@ -54,6 +54,170 @@ class AnalyticsService {
     return _safeLog(name: 'share_copied');
   }
 
+  Future<void> logChallengeSent({
+    required int streak,
+    required String fromUserId,
+    required int dayIndex,
+    String variant = 'A',
+  }) {
+    return _safeLog(
+      name: 'challenge_sent',
+      parameters: {
+        'streak': streak,
+        'from_user_id': fromUserId,
+        'day_index': dayIndex,
+        'variant': variant,
+      },
+    );
+  }
+
+  Future<void> logChallengeOpened({
+    required int streak,
+    required String fromUserId,
+    required int dayIndex,
+    String variant = 'A',
+  }) {
+    return _safeLog(
+      name: 'challenge_opened',
+      parameters: {
+        'streak': streak,
+        'from_user_id': fromUserId,
+        'day_index': dayIndex,
+        'variant': variant,
+      },
+    );
+  }
+
+  Future<void> logChallengeAccepted({
+    required int streak,
+    required String fromUserId,
+    required int dayIndex,
+    String variant = 'A',
+  }) {
+    return _safeLog(
+      name: 'challenge_accepted',
+      parameters: {
+        'streak': streak,
+        'from_user_id': fromUserId,
+        'day_index': dayIndex,
+        'variant': variant,
+      },
+    );
+  }
+
+  Future<void> logShareToInstallConversion({
+    required String fromUserId,
+    required int streak,
+    required int dayIndex,
+    String variant = 'A',
+  }) {
+    return _safeLog(
+      name: 'share_to_install_conversion',
+      parameters: {
+        'from_user_id': fromUserId,
+        'streak': streak,
+        'day_index': dayIndex,
+        'variant': variant,
+      },
+    );
+  }
+
+  Future<void> logViralCoefficient({
+    required double value,
+    required int invites,
+    required int accepted,
+    required int streak,
+    required int dayIndex,
+    String variant = 'A',
+  }) {
+    return _safeLog(
+      name: 'viral_coefficient',
+      parameters: {
+        'value_x100': (value * 100).round(),
+        'invites': invites,
+        'accepted': accepted,
+        'streak': streak,
+        'day_index': dayIndex,
+        'variant': variant,
+      },
+    );
+  }
+
+  Future<void> logLeaderboardViewed({
+    required int streak,
+    required int dayIndex,
+    String variant = 'A',
+  }) {
+    return _safeLog(
+      name: 'leaderboard_viewed',
+      parameters: {
+        'streak': streak,
+        'day_index': dayIndex,
+        'variant': variant,
+      },
+    );
+  }
+
+  Future<void> logFriendLinkCreated({
+    required int streak,
+    required int dayIndex,
+    String variant = 'A',
+  }) {
+    return _safeLog(
+      name: 'friend_link_created',
+      parameters: {
+        'streak': streak,
+        'day_index': dayIndex,
+        'variant': variant,
+      },
+    );
+  }
+
+  Future<void> logFriendJoined({
+    required int streak,
+    required int dayIndex,
+    String variant = 'A',
+  }) {
+    return _safeLog(
+      name: 'friend_joined',
+      parameters: {
+        'streak': streak,
+        'day_index': dayIndex,
+        'variant': variant,
+      },
+    );
+  }
+
+  Future<void> logFriendStreakActive({
+    required int streak,
+    required int dayIndex,
+    String variant = 'A',
+  }) {
+    return _safeLog(
+      name: 'friend_streak_active',
+      parameters: {
+        'streak': streak,
+        'day_index': dayIndex,
+        'variant': variant,
+      },
+    );
+  }
+
+  Future<void> logDailyCounterSeen({
+    required int streak,
+    required int dayIndex,
+    String variant = 'A',
+  }) {
+    return _safeLog(
+      name: 'daily_counter_seen',
+      parameters: {
+        'streak': streak,
+        'day_index': dayIndex,
+        'variant': variant,
+      },
+    );
+  }
+
   Future<void> logDoneExperienceShown() {
     return _safeLog(name: 'done_experience_shown');
   }

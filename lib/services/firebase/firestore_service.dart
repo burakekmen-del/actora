@@ -42,6 +42,17 @@ class FirestoreService {
       'last_task_assigned_local_date';
   static const String _weeklyCompletedCountKey = 'weekly_completed_count';
   static const String _weeklyAnchorLocalDateKey = 'weekly_anchor_local_date';
+  static const String _localUserIdKey = 'local_user_id';
+  static const String _pendingChallengeInviteKey = 'pending_challenge_invite';
+  static const String _challengeInviteAcceptedCountKey =
+      'challenge_invite_accepted_count';
+  static const String _challengeInviteSentCountKey =
+      'challenge_invite_sent_count';
+  static const String _challengeRewardedFromSetKey = 'challenge_rewarded_from';
+  static const String _todayCompletionCountKey = 'today_completion_count';
+  static const String _todayCompletionCountDateKey =
+      'today_completion_count_date';
+  static const String _friendStreakKey = 'friend_streak';
 
   Future<SharedPreferences> get _prefs async => SharedPreferences.getInstance();
 
@@ -216,6 +227,208 @@ class FirestoreService {
     await prefs.remove(_currentTaskKey);
   }
 
+  Future<String> getOrCreateLocalUserId() async {
+    final prefs = await _prefs;
+    final existing = prefs.getString(_localUserIdKey);
+    if (existing != null && existing.isNotEmpty) {
+      return existing;
+    }
+
+    final created = 'u_${DateTime.now().millisecondsSinceEpoch}';
+    await prefs.setString(_localUserIdKey, created);
+    return created;
+  }
+
+  Future<void> captureChallengeDeepLink(Uri uri) async {
+    final supportedScheme = uri.scheme == 'app' || uri.scheme == 'actora';
+    final isChallenge = supportedScheme &&
+        uri.host == 'actora' &&
+        uri.pathSegments.isNotEmpty &&
+        uri.pathSegments.first == 'challenge';
+    if (!isChallenge) {
+      return;
+    }
+
+    final fromUserId = uri.queryParameters['from'];
+    final streak = int.tryParse(uri.queryParameters['streak'] ?? '') ?? 0;
+    if (fromUserId == null || fromUserId.isEmpty) {
+      return;
+    }
+
+    final invite = ChallengeInvite(
+      fromUserId: fromUserId,
+      streak: streak,
+      receivedAt: DateTime.now(),
+    );
+    final prefs = await _prefs;
+    await prefs.setString(
+        _pendingChallengeInviteKey, jsonEncode(invite.toMap()));
+  }
+
+  Future<ChallengeInvite?> loadPendingChallengeInvite() async {
+    final prefs = await _prefs;
+    final raw = prefs.getString(_pendingChallengeInviteKey);
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      return ChallengeInvite.fromMap(map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> clearPendingChallengeInvite() async {
+    final prefs = await _prefs;
+    await prefs.remove(_pendingChallengeInviteKey);
+  }
+
+  Future<void> markChallengeInviteSent() async {
+    final prefs = await _prefs;
+    final current = prefs.getInt(_challengeInviteSentCountKey) ?? 0;
+    await prefs.setInt(_challengeInviteSentCountKey, current + 1);
+  }
+
+  Future<void> markChallengeInviteAccepted() async {
+    final prefs = await _prefs;
+    final current = prefs.getInt(_challengeInviteAcceptedCountKey) ?? 0;
+    await prefs.setInt(_challengeInviteAcceptedCountKey, current + 1);
+  }
+
+  Future<int> getTodayCompletionCount() async {
+    final prefs = await _prefs;
+    final today = _dateKey(DateTime.now());
+    final storedDate = prefs.getString(_todayCompletionCountDateKey);
+
+    if (storedDate != today) {
+      final base = _simulatedDailyBase(today);
+      await prefs.setString(_todayCompletionCountDateKey, today);
+      await prefs.setInt(_todayCompletionCountKey, base);
+      return base;
+    }
+
+    final current = prefs.getInt(_todayCompletionCountKey);
+    if (current != null) {
+      return current;
+    }
+
+    final base = _simulatedDailyBase(today);
+    await prefs.setInt(_todayCompletionCountKey, base);
+    return base;
+  }
+
+  Future<int> incrementTodayCompletionCount() async {
+    final prefs = await _prefs;
+    final current = await getTodayCompletionCount();
+    final next = current + 1;
+    await prefs.setInt(_todayCompletionCountKey, next);
+    await prefs.setString(
+        _todayCompletionCountDateKey, _dateKey(DateTime.now()));
+    return next;
+  }
+
+  Future<void> bindFriendStreak({required String friendId}) async {
+    if (friendId.isEmpty) {
+      return;
+    }
+    final prefs = await _prefs;
+    final friend = FriendStreakState(
+      friendId: friendId,
+      friendName: _friendName(friendId),
+      sharedStreakDays: 0,
+      isActive: true,
+      linkedAt: DateTime.now(),
+      lastSyncedDate: _dateKey(DateTime.now()),
+    );
+    await prefs.setString(_friendStreakKey, jsonEncode(friend.toMap()));
+  }
+
+  Future<FriendStreakState?> loadFriendStreakState() async {
+    final prefs = await _prefs;
+    final raw = prefs.getString(_friendStreakKey);
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final friend = FriendStreakState.fromMap(map);
+      if (!friend.isActive) {
+        return null;
+      }
+      return friend;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<FriendStreakState?> updateFriendStreakAfterUserCompletion({
+    required int streak,
+  }) async {
+    final friend = await loadFriendStreakState();
+    if (friend == null) {
+      return null;
+    }
+
+    final today = _dateKey(DateTime.now());
+    if (friend.lastSyncedDate == today) {
+      return friend;
+    }
+
+    final bothCompleted =
+        ((today.hashCode + friend.friendId.hashCode + streak) % 100) < 68;
+    final next = friend.copyWith(
+      sharedStreakDays:
+          bothCompleted ? friend.sharedStreakDays + 1 : friend.sharedStreakDays,
+      lastSyncedDate: today,
+    );
+
+    final prefs = await _prefs;
+    await prefs.setString(_friendStreakKey, jsonEncode(next.toMap()));
+    return next;
+  }
+
+  Future<void> grantChallengeReferralReward(
+      {required String fromUserId}) async {
+    final prefs = await _prefs;
+    final rewardedSet =
+        prefs.getStringList(_challengeRewardedFromSetKey) ?? const <String>[];
+    if (rewardedSet.contains(fromUserId)) {
+      return;
+    }
+
+    final freezeCount = prefs.getInt(_freezeCountKey) ?? 0;
+    await prefs.setInt(_freezeCountKey, freezeCount + 1);
+    await prefs.setStringList(
+      _challengeRewardedFromSetKey,
+      <String>[...rewardedSet, fromUserId],
+    );
+    _emitEntitlement(await getUserEntitlement());
+  }
+
+  Future<(int sent, int accepted, double coefficient)>
+      getViralSnapshot() async {
+    final prefs = await _prefs;
+    final sent = prefs.getInt(_challengeInviteSentCountKey) ?? 0;
+    final accepted = prefs.getInt(_challengeInviteAcceptedCountKey) ?? 0;
+    final coefficient = sent == 0 ? 0.0 : accepted / sent;
+    return (sent, accepted, coefficient);
+  }
+
+  Future<void> resetForChallengeAcceptance() async {
+    final prefs = await _prefs;
+    await prefs.setBool(_onboardingCompletedKey, false);
+    await prefs.remove(_selectedFocusKey);
+    await prefs.remove(_preferredDurationKey);
+    await prefs.remove(_currentTaskKey);
+    await prefs.remove(_lastTaskAssignedLocalDateKey);
+    await prefs.remove(_lastTaskCompletionLocalDateKey);
+    await prefs.setInt(_streakCountKey, 0);
+    await prefs.setInt(_weeklyCompletedCountKey, 0);
+    await prefs.setString(_weeklyAnchorLocalDateKey, _dateKey(DateTime.now()));
+  }
+
   Future<WeeklyProgress> getWeeklyProgress({int weeklyGoal = 7}) async {
     final prefs = await _prefs;
     final now = DateTime.now();
@@ -348,6 +561,25 @@ class FirestoreService {
         _lastTaskAssignedLocalDateKey, _dateKey(DateTime.now()));
   }
 
+  int _simulatedDailyBase(String dateKey) {
+    final hash = dateKey.hashCode.abs();
+    return 1180 + (hash % 140);
+  }
+
+  String _friendName(String friendId) {
+    const names = <String>[
+      'Alex',
+      'Maya',
+      'Noah',
+      'Lina',
+      'Eren',
+      'Iris',
+      'Mert',
+      'Sena',
+    ];
+    return names[friendId.hashCode.abs() % names.length];
+  }
+
   DateTime? _parseDateTime(String? raw) {
     if (raw == null || raw.isEmpty) {
       return null;
@@ -423,6 +655,95 @@ class WeeklyProgress {
 
   final int completed;
   final int goal;
+}
+
+class ChallengeInvite {
+  const ChallengeInvite({
+    required this.fromUserId,
+    required this.streak,
+    required this.receivedAt,
+  });
+
+  final String fromUserId;
+  final int streak;
+  final DateTime receivedAt;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'fromUserId': fromUserId,
+      'streak': streak,
+      'receivedAt': receivedAt.toIso8601String(),
+    };
+  }
+
+  factory ChallengeInvite.fromMap(Map<String, dynamic> map) {
+    return ChallengeInvite(
+      fromUserId: (map['fromUserId'] as String?) ?? '',
+      streak: (map['streak'] as num?)?.toInt() ?? 0,
+      receivedAt: DateTime.tryParse(map['receivedAt']?.toString() ?? '') ??
+          DateTime.now(),
+    );
+  }
+}
+
+class FriendStreakState {
+  const FriendStreakState({
+    required this.friendId,
+    required this.friendName,
+    required this.sharedStreakDays,
+    required this.isActive,
+    required this.linkedAt,
+    required this.lastSyncedDate,
+  });
+
+  final String friendId;
+  final String friendName;
+  final int sharedStreakDays;
+  final bool isActive;
+  final DateTime linkedAt;
+  final String lastSyncedDate;
+
+  FriendStreakState copyWith({
+    String? friendId,
+    String? friendName,
+    int? sharedStreakDays,
+    bool? isActive,
+    DateTime? linkedAt,
+    String? lastSyncedDate,
+  }) {
+    return FriendStreakState(
+      friendId: friendId ?? this.friendId,
+      friendName: friendName ?? this.friendName,
+      sharedStreakDays: sharedStreakDays ?? this.sharedStreakDays,
+      isActive: isActive ?? this.isActive,
+      linkedAt: linkedAt ?? this.linkedAt,
+      lastSyncedDate: lastSyncedDate ?? this.lastSyncedDate,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'friendId': friendId,
+      'friendName': friendName,
+      'sharedStreakDays': sharedStreakDays,
+      'isActive': isActive,
+      'linkedAt': linkedAt.toIso8601String(),
+      'lastSyncedDate': lastSyncedDate,
+    };
+  }
+
+  factory FriendStreakState.fromMap(Map<String, dynamic> map) {
+    return FriendStreakState(
+      friendId: (map['friendId'] as String?) ?? '',
+      friendName: (map['friendName'] as String?) ?? 'Friend',
+      sharedStreakDays: (map['sharedStreakDays'] as num?)?.toInt() ?? 0,
+      isActive: map['isActive'] != false,
+      linkedAt: DateTime.tryParse(map['linkedAt']?.toString() ?? '') ??
+          DateTime.now(),
+      lastSyncedDate:
+          (map['lastSyncedDate'] as String?) ?? '${DateTime.now().year}-01-01',
+    );
+  }
 }
 
 class UserEntitlement {

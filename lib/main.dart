@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,10 +17,21 @@ Future<void> main() async {
 
   final firestoreService = FirestoreService();
   final analyticsService = AnalyticsService();
+  final appLinks = AppLinks();
 
   AppLog.flow('runtime.bootstrap', 'begin');
 
   final appOpenResult = await firestoreService.trackAppOpenAndReturnIsDay2();
+  final initialUri = await appLinks.getInitialLink();
+  if (initialUri != null) {
+    await firestoreService.captureChallengeDeepLink(initialUri);
+  }
+  appLinks.uriLinkStream.listen((uri) {
+    unawaited(firestoreService.captureChallengeDeepLink(uri));
+  }, onError: (Object error, StackTrace stackTrace) {
+    AppLog.error('runtime.bootstrap.deep_link_stream', error, stackTrace);
+  });
+
   AppLog.verbose('runtime.bootstrap.app_open_checked', details: {
     'is_day2_return': appOpenResult.isDay2Return,
   });

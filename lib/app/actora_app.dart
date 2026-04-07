@@ -10,6 +10,8 @@ import '../features/debug/presentation/debug_shell.dart';
 import '../features/dashboard/presentation/today_screen.dart';
 import '../features/onboarding/application/onboarding_controller.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
+import '../services/analytics/analytics_service.dart';
+import '../services/firebase/firestore_service.dart';
 
 class ActoraApp extends ConsumerWidget {
   const ActoraApp({super.key});
@@ -59,8 +61,137 @@ class ActoraApp extends ConsumerWidget {
         return const Locale('en');
       },
       theme: AppTheme.darkTheme,
-      home: DebugShell(child: home),
+      home: _ChallengeInviteGate(child: DebugShell(child: home)),
     );
+  }
+}
+
+class _ChallengeInviteGate extends ConsumerStatefulWidget {
+  const _ChallengeInviteGate({required this.child});
+
+  final Widget child;
+
+  @override
+  ConsumerState<_ChallengeInviteGate> createState() =>
+      _ChallengeInviteGateState();
+}
+
+class _ChallengeInviteGateState extends ConsumerState<_ChallengeInviteGate> {
+  bool _handled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPendingInvite();
+    });
+  }
+
+  Future<void> _checkPendingInvite() async {
+    if (_handled) {
+      return;
+    }
+
+    final service = ref.read(firestoreServiceProvider);
+    final invite = await service.loadPendingChallengeInvite();
+    if (invite == null || invite.fromUserId.isEmpty) {
+      return;
+    }
+    _handled = true;
+
+    if (!mounted) {
+      return;
+    }
+    final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
+    final analytics = ref.read(analyticsServiceProvider);
+
+    await analytics.logChallengeOpened(
+      streak: invite.streak,
+      fromUserId: invite.fromUserId,
+      dayIndex: invite.streak,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(l10n.deepLinkChallengeTitle),
+          content: Text(l10n.deepLinkChallengeBody),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await service.clearPendingChallengeInvite();
+                if (context.mounted) {
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Text(l10n.declineChallengeLabel),
+            ),
+            FilledButton(
+              onPressed: () async {
+                await service.markChallengeInviteAccepted();
+                await analytics.logChallengeAccepted(
+                  streak: invite.streak,
+                  fromUserId: invite.fromUserId,
+                  dayIndex: invite.streak,
+                );
+                await analytics.logFriendJoined(
+                  streak: invite.streak,
+                  dayIndex: invite.streak,
+                );
+                await analytics.logShareToInstallConversion(
+                  fromUserId: invite.fromUserId,
+                  streak: invite.streak,
+                  dayIndex: invite.streak,
+                );
+                await service.grantChallengeReferralReward(
+                  fromUserId: invite.fromUserId,
+                );
+                await service.bindFriendStreak(friendId: invite.fromUserId);
+                final snapshot = await service.getViralSnapshot();
+                await analytics.logViralCoefficient(
+                  value: snapshot.$3,
+                  invites: snapshot.$1,
+                  accepted: snapshot.$2,
+                  streak: invite.streak,
+                  dayIndex: invite.streak,
+                );
+                await service.clearPendingChallengeInvite();
+                await service.resetForChallengeAcceptance();
+
+                if (!context.mounted) {
+                  return;
+                }
+                ref.read(onboardingCompletedProvider.notifier).state = false;
+                ref.read(onboardingStepProvider.notifier).state = 0;
+                Navigator.of(context).pushAndRemoveUntil(
+                  PageRouteBuilder<void>(
+                    transitionDuration: const Duration(milliseconds: 180),
+                    pageBuilder: (_, __, ___) => const OnboardingScreen(),
+                    transitionsBuilder:
+                        (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(opacity: animation, child: child);
+                    },
+                  ),
+                  (route) => false,
+                );
+              },
+              child: Text(l10n.acceptChallengeLabel),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }
 

@@ -212,6 +212,117 @@ class AppLocalizations {
 
   String get shareScreenActora => 'Actora';
 
+  String get challengeInviteLine => isTurkish
+      ? 'Seni 7 gunluk bir denemeye davet ediyorum.'
+      : 'I invite you to a 7-day challenge.';
+
+  String challengeAggressiveLineByStreak(int streak) {
+    if (streak >= 7) {
+      return isTurkish
+          ? 'Az kisi buraya gelir.\nBen geldim.'
+          : 'Few people reach this point.\nI did.';
+    }
+    if (streak >= 3) {
+      return isTurkish
+          ? 'Cogu kisi burada durur.\nBen devam ettim.'
+          : 'Most people stop here.\nI kept going.';
+    }
+    return isTurkish
+        ? 'Bugun basladim. Devam ediyorum.'
+        : 'Started today. I am keeping going.';
+  }
+
+  String challengeQuestionByStreak(int streak) {
+    if (streak >= 7) {
+      return isTurkish
+          ? 'Bu seviyede sen kac gun devam edersin?'
+          : 'At this level, how long would you keep going?';
+    }
+    if (streak >= 3) {
+      return isTurkish
+          ? '3. gunden sonra sen kac gun devam edersin?'
+          : 'After day 3, how long would you keep going?';
+    }
+    return isTurkish
+        ? 'Sen kac gun devam edersin?'
+        : 'How many days will you keep going?';
+  }
+
+  String get deepLinkChallengeTitle =>
+      isTurkish ? 'Sana bir davet geldi.' : 'You got a challenge invite.';
+
+  String get deepLinkChallengeBody =>
+      isTurkish ? 'Devam etmek ister misin?' : 'Do you want to join?';
+
+  String get acceptChallengeLabel => isTurkish ? 'Kabul Et' : 'Accept';
+
+  String get declineChallengeLabel => isTurkish ? 'Vazgec' : 'Decline';
+
+  String get tiktokPrompt =>
+      isTurkish ? 'Bunu paylasmak ister misin?' : 'Want to share this?';
+
+  String tiktokOverlay(int streak) {
+    return 'Day $streak\nStill going.';
+  }
+
+  String get tiktokHint => isTurkish
+      ? '10-15 sn video cek, metni ustune koy, TikTok/Reels\'e at.'
+      : 'Record 10-15s, overlay the text, post to TikTok/Reels.';
+
+  String get tiktokCta =>
+      isTurkish ? 'TikTok/Reels metnini kopyala' : 'Copy TikTok/Reels overlay';
+
+  String get socialPressureCounterLine => isTurkish
+      ? 'Bugun 1,284 kisi gorevini tamamladi.'
+      : '1,284 people finished today.';
+
+  String socialPressureCounter(int count) {
+    return isTurkish
+        ? 'Bugun $count kisi gorevini tamamladi.'
+        : '$count people completed today.';
+  }
+
+  String pressurePercentByStreak(int streak) {
+    if (streak >= 14) {
+      return isTurkish ? 'Elite.' : 'Elite.';
+    }
+    if (streak >= 7) {
+      return isTurkish ? 'Top 10%.' : 'Top 10%.';
+    }
+    if (streak >= 5) {
+      return isTurkish
+          ? 'Sadece %31 buraya kadar geldi.'
+          : 'Only 31% made it this far.';
+    }
+    if (streak >= 3) {
+      return isTurkish ? 'Insanlarin %72si burada birakir.' : '72% quit here.';
+    }
+    return isTurkish ? 'Basladin.' : 'You started.';
+  }
+
+  String leaderboardRankLabel(int rank) {
+    return isTurkish ? 'Bugun #$rank siradasin' : 'You are #$rank today';
+  }
+
+  String leaderboardTopStreakLabel(int streak) {
+    return isTurkish
+        ? 'En yuksek seri: $streak gun'
+        : 'Top streak: $streak days';
+  }
+
+  String friendStreakLabel({required String friendName, required int day}) {
+    return isTurkish
+        ? '$friendName ile seri yapiyorsun (Gun $day)'
+        : 'You are on a streak with $friendName (Day $day)';
+  }
+
+  String get challengeFriendButton =>
+      isTurkish ? 'Arkadasini davet et' : 'Invite a friend';
+
+  String get referralRewardLine => isTurkish
+      ? 'Arkadasin katilirsa +1 freeze kazanirsin.'
+      : 'If a friend joins, you earn +1 freeze.';
+
   String get shareScreenCopied => isTurkish ? 'Kopyalandı.' : 'Copied.';
 
   String get shareScreenAutoCopied =>

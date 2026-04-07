@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/localization/app_localizations.dart';
 import '../../../core/logging/app_log.dart';
 import '../../../services/analytics/analytics_service.dart';
+import '../../../services/firebase/firestore_service.dart';
 
 enum SharePlatform { general, x, instagram, whatsapp, linkedin }
 
@@ -30,6 +31,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   bool _isCopying = false;
   bool _actionsEnabled = false;
   bool _shareClicked = false;
+  String _fromUserId = 'local';
   Timer? _activationTimer;
 
   @override
@@ -39,6 +41,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       'streak': widget.streak,
     });
     unawaited(ref.read(analyticsServiceProvider).logShareScreenShown());
+    unawaited(_prepareViralContext());
     _activationTimer = Timer(const Duration(milliseconds: 1200), () {
       if (!mounted) return;
       setState(() {
@@ -51,6 +54,17 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AppLog.flow('share.screen', 'auto_copy_triggered');
       _copyCurrentText(auto: true, showToast: false);
+    });
+  }
+
+  Future<void> _prepareViralContext() async {
+    final service = ref.read(firestoreServiceProvider);
+    final userId = await service.getOrCreateLocalUserId();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _fromUserId = userId;
     });
   }
 
@@ -68,9 +82,8 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
-    final posterTheme = _posterTheme(widget.streak, l10n);
     final shareText = _shareText(l10n, widget.streak, _selectedPlatform);
-    final headline = _shareHeadline(l10n, _selectedPlatform);
+    final aggressiveLine = l10n.challengeAggressiveLineByStreak(widget.streak);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -83,9 +96,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: IconButton(
-                  onPressed: _actionsEnabled
-                      ? () => Navigator.of(context).pop()
-                      : null,
+                  onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close, color: Colors.white),
                 ),
               ),
@@ -118,13 +129,9 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                 key: _posterKey,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: posterTheme.gradient,
-                    ),
+                    color: Colors.black,
                     borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: posterTheme.border),
+                    border: Border.all(color: Colors.white24),
                     boxShadow: const [
                       BoxShadow(
                         color: Colors.black54,
@@ -142,18 +149,18 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          posterTheme.badge,
+                          '${l10n.shareScreenDayLabel.toUpperCase()} ${widget.streak}',
                           textAlign: TextAlign.center,
                           style:
                               Theme.of(context).textTheme.labelLarge?.copyWith(
-                                    color: posterTheme.accent,
+                                    color: Colors.white,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 2,
                                   ),
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          '${l10n.shareScreenDayLabel} ${widget.streak}',
+                          'MOST PEOPLE STOP HERE',
                           textAlign: TextAlign.center,
                           style: Theme.of(context)
                               .textTheme
@@ -165,7 +172,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          headline,
+                          'YOU KEPT GOING',
                           textAlign: TextAlign.center,
                           style: Theme.of(context)
                               .textTheme
@@ -180,34 +187,43 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                           width: 54,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: posterTheme.accent,
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(999),
                           ),
                         ),
                         const SizedBox(height: 14),
                         Text(
-                          l10n.shareLineByStreak(widget.streak),
+                          'ACTORA',
                           textAlign: TextAlign.center,
                           style:
                               Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    color: Colors.white,
+                                    color: Colors.white70,
                                     height: 1.5,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w700,
                                   ),
                         ),
                         const SizedBox(height: 14),
                         Text(
-                          l10n.shareScreenActora,
+                          aggressiveLine,
                           textAlign: TextAlign.center,
                           style:
-                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.white54,
+                                    letterSpacing: 0.2,
+                                  ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          l10n.pressurePercentByStreak(widget.streak),
+                          textAlign: TextAlign.center,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: Colors.white70,
-                                    letterSpacing: 1.2,
                                   ),
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          l10n.shareStatementFootnote,
+                          l10n.challengeInviteLine,
                           textAlign: TextAlign.center,
                           style:
                               Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -231,17 +247,130 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                           'platform': _selectedPlatform.name,
                         });
                         await analytics.logShareClicked();
+                        await analytics.logChallengeSent(
+                          streak: widget.streak,
+                          fromUserId: _fromUserId,
+                          dayIndex: widget.streak,
+                        );
+                        await ref
+                            .read(firestoreServiceProvider)
+                            .markChallengeInviteSent();
+                        final snapshot = await ref
+                            .read(firestoreServiceProvider)
+                            .getViralSnapshot();
+                        await analytics.logViralCoefficient(
+                          value: snapshot.$3,
+                          invites: snapshot.$1,
+                          accepted: snapshot.$2,
+                          streak: widget.streak,
+                          dayIndex: widget.streak,
+                        );
                         await _sharePosterImage(shareText: shareText);
+                        if (mounted) {
+                          setState(() {});
+                        }
                       }
                     : null,
                 child: Text(l10n.shareLabel),
+              ),
+              const SizedBox(height: 8),
+              FilledButton.tonal(
+                onPressed: _actionsEnabled
+                    ? () async {
+                        final analytics = ref.read(analyticsServiceProvider);
+                        final text = _shareText(
+                          l10n,
+                          widget.streak,
+                          _selectedPlatform,
+                        );
+                        _shareClicked = true;
+                        await analytics.logFriendLinkCreated(
+                          streak: widget.streak,
+                          dayIndex: widget.streak,
+                        );
+                        await analytics.logChallengeSent(
+                          streak: widget.streak,
+                          fromUserId: _fromUserId,
+                          dayIndex: widget.streak,
+                        );
+                        await ref
+                            .read(firestoreServiceProvider)
+                            .markChallengeInviteSent();
+                        await SharePlus.instance.share(
+                          ShareParams(
+                            text: text,
+                            subject: 'Actora Challenge',
+                          ),
+                        );
+                        if (mounted) {
+                          setState(() {});
+                        }
+                      }
+                    : null,
+                child: Text(l10n.challengeFriendButton),
               ),
               const SizedBox(height: 10),
               OutlinedButton(
                 onPressed: !_actionsEnabled || _isCopying
                     ? null
-                    : () => _copyCurrentText(),
+                    : () async {
+                        await _copyCurrentText();
+                        if (!mounted) {
+                          return;
+                        }
+                        setState(() {});
+                      },
                 child: Text(l10n.shareCopyButton),
+              ),
+              const SizedBox(height: 10),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.white10,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        l10n.tiktokPrompt,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        l10n.tiktokHint,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Colors.white70),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: _actionsEnabled
+                            ? () async {
+                                final messenger = ScaffoldMessenger.of(context);
+                                final overlayText =
+                                    l10n.tiktokOverlay(widget.streak);
+                                await Clipboard.setData(
+                                  ClipboardData(text: overlayText),
+                                );
+                                if (!mounted) {
+                                  return;
+                                }
+                                setState(() {});
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text(l10n.tiktokCta)),
+                                );
+                              }
+                            : null,
+                        child: Text(l10n.tiktokCta),
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
               Text(
@@ -252,6 +381,15 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Colors.white54,
                     ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                l10n.referralRewardLine,
+                textAlign: TextAlign.center,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.white60),
               ),
             ],
           ),
@@ -275,8 +413,8 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     }
   }
 
-  String _shareHeadline(AppLocalizations l10n, SharePlatform platform) {
-    return l10n.shareScreenStillGoing;
+  String _challengeLink() {
+    return 'actora://actora/challenge?from=$_fromUserId&streak=${widget.streak}';
   }
 
   String _shareText(
@@ -284,7 +422,11 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     int streak,
     SharePlatform platform,
   ) {
-    return '${_streakLabel(l10n, streak)}.\n${l10n.shareScreenStillGoing}\n\n${l10n.shareLineByStreak(streak)}\n\n${l10n.shareScreenActora}';
+    return '$streak gundur yapiyorum.\n'
+        '${l10n.challengeAggressiveLineByStreak(streak)}\n'
+        '${l10n.challengeQuestionByStreak(streak)}\n'
+        '${l10n.challengeInviteLine}\n'
+        '${_challengeLink()}';
   }
 
   Future<void> _copyCurrentText(
@@ -327,6 +469,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       'streak': widget.streak,
     });
     final l10n = AppLocalizations.ofLocale(Localizations.localeOf(context));
+    final messenger = ScaffoldMessenger.of(context);
     final bytes = await _capturePosterBytes();
 
     if (bytes == null) {
@@ -365,7 +508,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
       SnackBar(content: Text(l10n.shareCopiedToast)),
     );
   }
@@ -385,69 +528,4 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     }
     return data.buffer.asUint8List();
   }
-
-  String _streakLabel(AppLocalizations l10n, int streak) {
-    return '${l10n.shareScreenDayLabel} $streak';
-  }
-
-  _PosterTheme _posterTheme(int streak, AppLocalizations l10n) {
-    if (streak >= 14) {
-      return _PosterTheme(
-        badge: l10n.isTurkish ? 'DURDURULAMAZ' : 'UNSTOPPABLE',
-        footer: l10n.isTurkish
-            ? 'Zincir ürünün kendisi.'
-            : 'The chain is the product.',
-        accent: const Color(0xFFFF5C5C),
-        border: const Color(0x33FF5C5C),
-        gradient: const [Color(0xFF240606), Color(0xFF0C0C0C)],
-      );
-    }
-    if (streak >= 7) {
-      return _PosterTheme(
-        badge: l10n.isTurkish ? 'KİLİTLENDİ' : 'LOCKED IN',
-        footer: l10n.isTurkish
-            ? 'Artık pazarlık yok.'
-            : 'You are no longer negotiating.',
-        accent: const Color(0xFFFFD166),
-        border: const Color(0x33FFD166),
-        gradient: const [Color(0xFF191919), Color(0xFF090909)],
-      );
-    }
-    if (streak >= 3) {
-      return _PosterTheme(
-        badge: l10n.isTurkish ? 'İNŞA EDİLİYOR' : 'BUILDING',
-        footer: l10n.isTurkish
-            ? 'Momentum artık görünür.'
-            : 'Momentum is visible now.',
-        accent: const Color(0xFF8BE9FD),
-        border: const Color(0x338BE9FD),
-        gradient: const [Color(0xFF0D1420), Color(0xFF090909)],
-      );
-    }
-    return _PosterTheme(
-      badge: l10n.isTurkish ? 'BAŞLADI' : 'STARTED',
-      footer: l10n.isTurkish
-          ? 'İlk halka önemlidir.'
-          : 'The first chain link matters.',
-      accent: const Color(0xFFB4FF9F),
-      border: const Color(0x33B4FF9F),
-      gradient: const [Color(0xFF101512), Color(0xFF090909)],
-    );
-  }
-}
-
-class _PosterTheme {
-  const _PosterTheme({
-    required this.badge,
-    required this.footer,
-    required this.accent,
-    required this.border,
-    required this.gradient,
-  });
-
-  final String badge;
-  final String footer;
-  final Color accent;
-  final Color border;
-  final List<Color> gradient;
 }
