@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Actora Davetiye</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #000 0%, #1a1a1a 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+    }
+    .container {
+      max-width: 480px;
+      width: 100%;
+      padding: 20px;
+      text-align: center;
+    }
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      border-top: 3px solid #fff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .invite-card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 32px 24px;
+      animation: slideUp 0.5s ease-out;
+    }
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .avatar {
+      width: 72px;
+      height: 72px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      font-weight: bold;
+      margin: 0 auto 24px;
+    }
+    .sender-name {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .sender-streak {
+      font-size: 14px;
+      color: #aaa;
+      margin-bottom: 24px;
+    }
+    .streak-badge {
+      display: inline-block;
+      background: rgba(255, 193, 7, 0.1);
+      border: 1px solid rgba(255, 193, 7, 0.3);
+      color: #ffc107;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 12px;
+      margin-right: 8px;
+    }
+    .cta-button {
+      width: 100%;
+      height: 48px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      border-radius: 12px;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-top: 24px;
+    }
+    .cta-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+    }
+    .cta-button:active {
+      transform: translateY(0);
+    }
+    .error-message {
+      color: #ff6b6b;
+      font-size: 14px;
+      margin-bottom: 16px;
+      padding: 12px;
+      background: rgba(255, 107, 107, 0.1);
+      border-radius: 8px;
+      display: none;
+    }
+    .message-text {
+      margin: 24px 0;
+      color: #999;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Yükleniyor...</p>
+    </div>
+
+    <div id="inviteCard" class="invite-card" style="display: none">
+      <div class="avatar" id="avatarEmoji">🎯</div>
+      <div class="sender-name" id="senderName">Biri</div>
+      <div class="sender-streak">
+        <span class="streak-badge" id="streakBadge">5 gün çizgi</span>
+        <span style="color: #888" id="dayText">1. gün</span>
+      </div>
+      <div class="message-text">
+        <p id="inviteMessage" style="margin-bottom: 8px"></p>
+        <p style="font-size: 12px; opacity: 0.7">Onun gibi başarılı ol!</p>
+      </div>
+      <div class="error-message" id="errorMessage"></div>
+      <button class="cta-button" onclick="openApp()">
+        Uygulamayı Aç
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviteId = urlParams.get('ref') || '';
+    let inviteData = null;
+
+    const API_BASE = 'https://invite.hatirlatbana.com';
+
+    async function loadInviteData() {
+      if (!inviteId) {
+        showError('Geçersiz davetiye linki');
+        fallbackToStore();
+        return;
+      }
+
+      try {
+        const response = await axios.get(`${API_BASE}/api/invites/${inviteId}`, {
+          timeout: 5000,
+          headers: { 'Accept': 'application/json' }
+        });
+        
+        inviteData = response.data;
+        renderInvite();
+      } catch (error) {
+        console.error('Davetiye yüklenemedi:', error);
+        showError('Davetiye bulunamadı. Doğrudan indir:');
+        fallbackToStore();
+      }
+    }
+
+    function renderInvite() {
+      const senderName = inviteData.sender_label || 'Bir arkadaş';
+      const streak = inviteData.sender_streak || 0;
+      const day = inviteData.day_index || 1;
+
+      document.getElementById('avatarEmoji').textContent = getEmojiForStreak(streak);
+      document.getElementById('senderName').textContent = senderName;
+      document.getElementById('streakBadge').textContent = `${streak} gün çizgi`;
+      document.getElementById('dayText').textContent = `${day}. günde`;
+
+      const message = `${senderName} ${streak > 0 ? `${streak} günlük çizgisiyle` : 'başlangıçta'} seni davet ediyor`;
+      document.getElementById('inviteMessage').textContent = message;
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('inviteCard').style.display = 'block';
+    }
+
+    function getEmojiForStreak(streak) {
+      if (streak >= 30) return '🔥';
+      if (streak >= 15) return '💪';
+      if (streak >= 7) return '⭐';
+      if (streak >= 1) return '🚀';
+      return '🎯';
+    }
+
+    function showError(message) {
+      const errorEl = document.getElementById('errorMessage');
+      errorEl.textContent = message;
+      errorEl.style.display = 'block';
+    }
+
+    function openApp() {
+      const deepLinkUrl = `actora://invite?ref=${inviteId}`;
+      const appStoreUrl = 'https://apps.apple.com';
+
+      window.location.href = deepLinkUrl;
+
+      setTimeout(() => {
+        window.location.href = appStoreUrl;
+      }, 2000);
+    }
+
+    function fallbackToStore() {
+      setTimeout(() => {
+        document.getElementById('loading').style.display = 'none';
+        const button = document.querySelector('.cta-button');
+        if (button) button.textContent = 'App Store\'da Aç';
+        button.onclick = () => window.location.href = 'https://apps.apple.com';
+      }, 2000);
+    }
+
+    loadInviteData();
+  </script>
+</head>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<body style="background:black;color:white;text-align:center;margin-top:100px;">
+  <h1>Opening Actora...</h1>
+</body>
+</html>

@@ -2,7 +2,7 @@
     <application
         android:label="actora"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -36,6 +36,19 @@
                     android:scheme="actora"
                     android:host="actora"
                     android:pathPrefix="/challenge" />
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="invite.hatirlatbana.com"
+                    android:pathPrefix="/invite" />
+                <data
+                    android:scheme="https"
+                    android:host="www.invite.hatirlatbana.com"
+                    android:pathPrefix="/invite" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

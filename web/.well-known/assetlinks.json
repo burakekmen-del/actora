@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.hatirlatbana.invite",
+      "sha256_cert_fingerprints": [
+        "CF:29:7D:DC:9B:9F:F6:35:72:7B:DC:A6:7E:40:1A:B9:80:58:C6:21:ED:03:AF:1E:52:8C:C0:F0:63:1D:96:72"
+      ]
+    }
+  }
+]

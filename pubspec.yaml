@@ -16,6 +16,7 @@ dependencies:
   cross_file: ^0.3.4+2
   share_plus: ^12.0.2
   shared_preferences: ^2.3.2
+  http: ^1.2.2
   sensors_plus: ^6.1.1
   cupertino_icons: ^1.0.8
 
@@ -25,7 +26,15 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.14.0
 
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/logo.png
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: assets/logo.png
+  remove_alpha_ios: true
+
 flutter:
   uses-material-design: true
   assets:
-    - assets/logo.jpg
+    - assets/logo.png

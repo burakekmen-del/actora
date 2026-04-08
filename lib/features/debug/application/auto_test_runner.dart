@@ -210,15 +210,15 @@ class AutoTestRunner {
           'Day1 kimlik mesajı uyuşmuyor',
         );
         _expect(
-          l10n.identityDoneMessage(3) == 'Çoğu kişi burada bırakır.',
+          l10n.identityDoneMessage(3) == 'İlerliyorsun.',
           'Day3 kimlik mesajı uyuşmuyor',
         );
         _expect(
-          l10n.identityDoneMessage(7) == 'Artık bırakan biri değilsin.',
+          l10n.identityDoneMessage(7) == 'İstikrar kuruldu.',
           'Day7 kimlik mesajı uyuşmuyor',
         );
         _expect(
-          l10n.identityDoneMessage(14) == 'Artık geri dönüş yok.',
+          l10n.identityDoneMessage(14) == 'Bu ritim artık çok güçlü.',
           'Day14 kimlik mesajı uyuşmuyor',
         );
       });
@@ -230,7 +230,7 @@ class AutoTestRunner {
           'Hook step one copy uyuşmuyor',
         );
         _expect(
-          l10n.hookMomentStepTwo == 'Şimdi bırakırsan, diğerleri gibisin.',
+          l10n.hookMomentStepTwo == 'Şimdi durursan, ritim bozulur.',
           'Hook step two copy uyuşmuyor',
         );
       });
@@ -254,23 +254,24 @@ class AutoTestRunner {
           'Dynamic day1 copy uyuşmuyor',
         );
         _expect(
-          l10n.dynamicMessage(3) == 'Sen bırakan biri değilsin.',
+          l10n.dynamicMessage(3) == 'İlerliyorsun.',
           'Dynamic day3 copy uyuşmuyor',
         );
         _expect(
-          l10n.dynamicMessage(6) == 'Sen bırakan biri değilsin.',
+          l10n.dynamicMessage(6) == 'İlerliyorsun.',
           'Dynamic day6 copy uyuşmuyor',
         );
         _expect(
-          l10n.dynamicMessage(10) == 'Artık geri dönüş yok.',
+          l10n.dynamicMessage(10) == 'İstikrar kuruldu.',
           'Dynamic day10 copy uyuşmuyor',
         );
         _expect(
-          l10n.socialPressureMessage(1) == 'Çoğu kişi burada bırakır.',
+          l10n.socialPressureMessage(1) == 'Devam et.',
           'Social pressure first stage copy uyuşmuyor',
         );
         _expect(
-          l10n.socialPressureMessage(3) == 'Çoğu kişi 3. günde bırakır.',
+          l10n.socialPressureMessage(3) ==
+              '3. gün genelde kritik bir eşik olur.',
           'Social pressure day3 copy uyuşmuyor',
         );
       });
@@ -279,7 +280,7 @@ class AutoTestRunner {
         final l10n = AppLocalizations('tr');
         _expect(l10n.lossHeadline == 'Seri bozuldu.', 'Loss headline uyumsuz');
         _expect(
-          l10n.lossBody(3) == '3 gün. Gitti.',
+          l10n.lossBody(3) == '3 gün tamamlandı. Devam et.',
           'Loss body uyumsuz',
         );
       });

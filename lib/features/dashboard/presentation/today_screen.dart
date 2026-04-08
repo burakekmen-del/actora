@@ -18,8 +18,6 @@ import '../../debug/domain/auto_test_step.dart';
 import '../../onboarding/domain/onboarding_models.dart';
 import '../../../services/analytics/analytics_service.dart';
 import '../../../services/firebase/firestore_service.dart';
-import '../../../services/growth/friend_streak_service.dart';
-import '../../../services/growth/leaderboard_service.dart';
 import '../../streak/application/streak_controller.dart';
 import '../../task/application/first_task_factory.dart';
 import '../../task/application/task_controller.dart';
@@ -51,11 +49,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
   bool _completeLock = false;
   bool _runningFullTest = false;
   int _weeklyCompleted = 0;
-  int _todayCompletionCount = 0;
-  int _leaderboardRank = 0;
-  int _leaderboardTopStreak = 0;
-  String? _friendStreakLine;
-  bool _socialEventsLogged = false;
   bool _justCompletedNow = false;
   static const int _weeklyGoal = 7;
   ExecutionDayState _executionDayState = ExecutionDayState.noTaskToday;
@@ -214,7 +207,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
         .read(streakProvider.notifier)
         .hydrateFromServer(firestoreService: service);
     await _refreshWeeklyProgress();
-    await _refreshSocialLayer();
 
     final savedTask = await service.loadSavedTask();
     final completedToday = await service.hasCompletedTaskToday();
@@ -262,50 +254,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
     setState(() {
       _executionDayState = ExecutionDayState.noTaskToday;
     });
-  }
-
-  Future<void> _refreshSocialLayer() async {
-    final service = ref.read(firestoreServiceProvider);
-    final analytics = ref.read(analyticsServiceProvider);
-    final streak = ref.read(streakProvider);
-    final daySeed = DateTime.now().difference(DateTime(2024, 1, 1)).inDays;
-    final leaderboard = ref
-        .read(leaderboardServiceProvider)
-        .buildForStreak(userStreak: streak, daySeed: daySeed);
-    final friendState =
-        await ref.read(friendStreakServiceProvider).getActiveFriendStreak();
-    final todayCount = await service.getTodayCompletionCount();
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _todayCompletionCount = todayCount;
-      _leaderboardRank = leaderboard.userRank;
-      _leaderboardTopStreak = leaderboard.topStreak;
-      _friendStreakLine = friendState == null
-          ? null
-          : AppLocalizations.ofLocale(Localizations.localeOf(context))
-              .friendStreakLabel(
-              friendName: friendState.friendName,
-              day: friendState.sharedStreakDays,
-            );
-    });
-
-    if (_socialEventsLogged) {
-      return;
-    }
-
-    await analytics.logDailyCounterSeen(
-      streak: streak,
-      dayIndex: daySeed,
-    );
-    await analytics.logLeaderboardViewed(
-      streak: streak,
-      dayIndex: daySeed,
-    );
-    _socialEventsLogged = true;
   }
 
   Future<void> _generateDailyTask() async {
@@ -475,26 +423,14 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
       streakResult = await streakController.completeDailyTask(
         firestoreService: ref.read(firestoreServiceProvider),
       );
-      final service = ref.read(firestoreServiceProvider);
-      _todayCompletionCount = await service.incrementTodayCompletionCount();
-      final friendState =
-          await ref.read(friendStreakServiceProvider).markDailyCompletion(
-                streak: streakResult.updatedStreakCount,
-              );
       await _refreshWeeklyProgress();
       _doneIdentityMessage = l10n.dynamicMessage(
         streakResult.updatedStreakCount,
       );
-      _doneCuriosityMessage = l10n.pressurePercentByStreak(
+      _doneCuriosityMessage = l10n.returnPressureByStreak(
         streakResult.updatedStreakCount,
       );
       await analytics.logTaskCompleted();
-      if (friendState != null) {
-        await analytics.logFriendStreakActive(
-          streak: streakResult.updatedStreakCount,
-          dayIndex: streakResult.updatedStreakCount,
-        );
-      }
       if (streakResult.updatedStreakCount == 3) {
         await analytics.logStreakDay3();
       }
@@ -951,8 +887,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
                   pulse: _streakPulseController,
                   freezeBadgeLabel: l10n.streakRiskLabel,
                   identityLevel: l10n.identityLevelLabel(streak),
-                  socialPressureLine:
-                      l10n.socialPressureCounter(_todayCompletionCount),
+                  socialPressureLine: l10n.returnPressureByStreak(streak),
                   weeklyProgressLabel: l10n.weeklyProgressLabel(
                     _weeklyCompleted,
                     _weeklyGoal,
@@ -960,37 +895,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen>
                   weeklyProgressValue: _weeklyCompleted / _weeklyGoal,
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  l10n.leaderboardRankLabel(
-                      _leaderboardRank <= 0 ? 12 : _leaderboardRank),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: Colors.white60),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  l10n.leaderboardTopStreakLabel(
-                    _leaderboardTopStreak <= 0 ? streak : _leaderboardTopStreak,
-                  ),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: Colors.white54),
-                ),
-                if (_friendStreakLine != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    _friendStreakLine!,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: Colors.white60),
-                  ),
-                ],
                 if (kDebugMode) ...[
                   const SizedBox(height: 8),
                   Align(

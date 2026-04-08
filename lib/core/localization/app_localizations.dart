@@ -57,15 +57,17 @@ class AppLocalizations {
 
   String get done => isTurkish ? 'Bitti.' : 'Done.';
 
-  String get unfinishedPressurePrimary => isTurkish ? 'Bitmedi.' : 'Not done.';
+  String get unfinishedPressurePrimary =>
+      isTurkish ? 'Hazırlanıyor.' : 'Getting ready.';
 
-  String get unfinishedPressureSecondary => isTurkish ? 'Yap.' : 'Do it.';
+  String get unfinishedPressureSecondary =>
+      isTurkish ? 'Devam et.' : 'Keep going.';
 
   String get doneMomentLineTwo =>
-      isTurkish ? 'Çoğu kişi burada bırakır.' : 'Most people stop here.';
+      isTurkish ? 'Sen devam ettin.' : 'You kept going.';
 
   String get doneMomentLineThree =>
-      isTurkish ? 'Sen bırakmadın.' : 'You didn\'t quit.';
+      isTurkish ? 'Bugünlük tamam.' : 'Done for today.';
 
   String get doOneMorePrompt =>
       isTurkish ? 'Devam etmek ister misin?' : 'Do you want to keep going?';
@@ -87,8 +89,8 @@ class AppLocalizations {
     }
     if (streak >= 3) {
       return isTurkish
-          ? 'Yarın gelmezsen sıfırlanır. Çoğu kişi burada bırakır.'
-          : 'If you miss tomorrow, it resets. Most people stop here.';
+          ? 'Yarın gelmezsen sıfırlanır. Devam etmeyi unutma.'
+          : 'If you miss tomorrow, it resets. Keep the momentum.';
     }
     return isTurkish
         ? 'Yarın gelmezsen sıfırlanır.'
@@ -102,28 +104,24 @@ class AppLocalizations {
       isTurkish ? 'Buraya kadar geldin.' : 'You made it this far.';
 
   String get hookMomentStepTwo => isTurkish
-      ? 'Şimdi bırakırsan, diğerleri gibisin.'
-      : 'If you stop now, you are like the others.';
+      ? 'Şimdi durursan, ritim bozulur.'
+      : 'If you stop now, the rhythm breaks.';
 
   String socialPressureMessage(int streak) {
     if (streak >= 3 && streak <= 5) {
       return isTurkish
-          ? 'Çoğu kişi 3. günde bırakır.'
-          : 'Most people quit on day 3.';
+          ? '3. gün genelde kritik bir eşik olur.'
+          : 'Day 3 is usually a critical point.';
     }
-    return isTurkish ? 'Çoğu kişi burada bırakır.' : 'Most people stop here.';
+    return isTurkish ? 'Devam et.' : 'Keep going.';
   }
 
   String dynamicMessage(int streak) {
     if (streak >= 7) {
-      return isTurkish
-          ? 'Artık geri dönüş yok.'
-          : 'There is no going back now.';
+      return isTurkish ? 'İstikrar kuruldu.' : 'Consistency is established.';
     }
     if (streak >= 3) {
-      return isTurkish
-          ? 'Sen bırakan biri değilsin.'
-          : 'You are not someone who quits.';
+      return isTurkish ? 'İlerliyorsun.' : 'You are progressing.';
     }
     if (streak >= 2) {
       return isTurkish ? 'Devam et.' : 'Keep going.';
@@ -138,34 +136,36 @@ class AppLocalizations {
   String returnPressureByStreak(int streak) {
     if (streak >= 7) {
       return isTurkish
-          ? 'Yarın gelmezsen sıfırlanır. Artık geri dönüş yok.'
-          : 'If you miss tomorrow, it resets. There is no going back now.';
+          ? 'Yarın gelmezsen sıfırlanır. Ritmi koru.'
+          : 'If you miss tomorrow, it resets. Keep the rhythm.';
     }
     if (streak >= 3) {
       return isTurkish
-          ? 'Yarın gelmezsen sıfırlanır. Sen bırakan biri değilsin.'
-          : 'If you miss tomorrow, it resets. You are not someone who quits.';
+          ? 'Yarın gelmezsen sıfırlanır. Devam etmek iyi olur.'
+          : 'If you miss tomorrow, it resets. Keep it moving.';
     }
     return returnPressureMessage;
   }
 
   String curiosityLoopMessage(int streak) {
     if (streak >= 7) {
-      return isTurkish ? 'Yarın daha zor.' : 'Tomorrow gets harder.';
+      return isTurkish
+          ? 'Yarın daha anlamlı.'
+          : 'Tomorrow feels more meaningful.';
     }
-    return isTurkish ? 'Yarın gerçek başlıyor.' : 'Tomorrow starts for real.';
+    return isTurkish ? 'Yarın devam et.' : 'Keep going tomorrow.';
   }
 
   String get lossHeadline => isTurkish ? 'Seri bozuldu.' : 'Streak broken.';
 
   String lossBody(int previousStreak) {
     if (previousStreak <= 0) {
-      return isTurkish ? 'Tekrar başla.' : 'Start again.';
+      return isTurkish ? 'Yeniden başla.' : 'Start again.';
     }
     if (isTurkish) {
-      return '$previousStreak gün. Gitti.';
+      return '$previousStreak gün tamamlandı. Devam et.';
     }
-    return '$previousStreak days. Gone.';
+    return '$previousStreak days completed. Keep going.';
   }
 
   String get shareLabel => isTurkish ? 'Paylaş' : 'Share';
@@ -173,18 +173,18 @@ class AppLocalizations {
   String get shareNudgeTitle => isTurkish ? 'Bitti.' : 'Done.';
 
   String get shareNudgeBody =>
-      isTurkish ? 'Çoğu kişi burada bırakır.' : 'Most people stop here.';
+      isTurkish ? 'Bugünlük tamam.' : 'Done for today.';
 
   String shareNudgeBodyByStreak(int streak) {
     if (streak >= 7) {
       return isTurkish
-          ? 'Bu seviyeye çok az kişi gelir.'
-          : 'Very few people reach this level.';
+          ? 'Bu seviyeye gelmen iyi bir işaret.'
+          : 'Reaching this level is a good sign.';
     }
     if (streak >= 3) {
       return isTurkish
-          ? 'Çoğu kişi 3. günde bırakır.'
-          : 'Most people quit on day 3.';
+          ? '3. gün önemli bir eşik.'
+          : 'Day 3 is an important checkpoint.';
     }
     return shareNudgeBody;
   }
@@ -192,10 +192,10 @@ class AppLocalizations {
   String shareLineByStreak(int streak) {
     if (streak >= 3) {
       return isTurkish
-          ? 'Çoğu kişi başarısız olur. Sen olmadın.'
-          : 'Most people fail. You didn\'t.';
+          ? 'Devam eden taraftasın.'
+          : 'You are on the continuing side.';
     }
-    return isTurkish ? 'Çoğu kişi bırakır.' : 'Most people quit.';
+    return isTurkish ? 'Bugün başladın.' : 'You started today.';
   }
 
   String get shareContinueLabel => isTurkish ? 'Devam et' : 'Continue';
@@ -206,9 +206,10 @@ class AppLocalizations {
       isTurkish ? 'Devam ediyorum.' : 'Still going.';
 
   String get shareStatementThirdLine =>
-      isTurkish ? 'Çoğu kişi bırakır.' : 'Most people quit.';
+      isTurkish ? 'Bugünlük tamam.' : 'Done for today.';
 
-  String get shareStatementFootnote => "You wouldn't get it.";
+  String get shareStatementFootnote =>
+      isTurkish ? 'İstersen sen de deneyebilirsin.' : 'You can try it too.';
 
   String get shareScreenActora => 'Actora';
 
@@ -219,13 +220,13 @@ class AppLocalizations {
   String challengeAggressiveLineByStreak(int streak) {
     if (streak >= 7) {
       return isTurkish
-          ? 'Az kisi buraya gelir.\nBen geldim.'
-          : 'Few people reach this point.\nI did.';
+          ? 'Bu seviyeye geldin.\nDevam et.'
+          : 'You reached this level.\nKeep going.';
     }
     if (streak >= 3) {
       return isTurkish
-          ? 'Cogu kisi burada durur.\nBen devam ettim.'
-          : 'Most people stop here.\nI kept going.';
+          ? 'İyi gidiyorsun.\nDevam ettin.'
+          : 'You are doing well.\nYou kept going.';
     }
     return isTurkish
         ? 'Bugun basladim. Devam ediyorum.'
@@ -273,41 +274,37 @@ class AppLocalizations {
       isTurkish ? 'TikTok/Reels metnini kopyala' : 'Copy TikTok/Reels overlay';
 
   String get socialPressureCounterLine => isTurkish
-      ? 'Bugun 1,284 kisi gorevini tamamladi.'
-      : '1,284 people finished today.';
+      ? 'Bugun tamamlananlar görünüyor.'
+      : 'Completed today is shown here.';
 
   String socialPressureCounter(int count) {
-    return isTurkish
-        ? 'Bugun $count kisi gorevini tamamladi.'
-        : '$count people completed today.';
+    return isTurkish ? 'Bugün tamamlanan: $count' : 'Completed today: $count';
   }
 
   String pressurePercentByStreak(int streak) {
     if (streak >= 14) {
-      return isTurkish ? 'Elite.' : 'Elite.';
+      return isTurkish ? 'Çok güçlü.' : 'Very strong.';
     }
     if (streak >= 7) {
-      return isTurkish ? 'Top 10%.' : 'Top 10%.';
+      return isTurkish ? 'Harika seri.' : 'Strong streak.';
     }
     if (streak >= 5) {
-      return isTurkish
-          ? 'Sadece %31 buraya kadar geldi.'
-          : 'Only 31% made it this far.';
+      return isTurkish ? 'İyi ilerleme.' : 'Good progress.';
     }
     if (streak >= 3) {
-      return isTurkish ? 'Insanlarin %72si burada birakir.' : '72% quit here.';
+      return isTurkish ? 'Bu nokta önemli.' : 'This is an important point.';
     }
     return isTurkish ? 'Basladin.' : 'You started.';
   }
 
   String leaderboardRankLabel(int rank) {
-    return isTurkish ? 'Bugun #$rank siradasin' : 'You are #$rank today';
+    return isTurkish ? 'Yerel siran #$rank' : 'Local rank #$rank';
   }
 
   String leaderboardTopStreakLabel(int streak) {
     return isTurkish
-        ? 'En yuksek seri: $streak gun'
-        : 'Top streak: $streak days';
+        ? 'Gunun en yuksek serisi: $streak gun'
+        : 'Today\'s top streak: $streak days';
   }
 
   String friendStreakLabel({required String friendName, required int day}) {
@@ -375,27 +372,25 @@ class AppLocalizations {
   String identityDoneMessage(int streak) {
     if (streak >= 14) {
       return isTurkish
-          ? 'Artık geri dönüş yok.'
-          : 'There is no going back now.';
+          ? 'Bu ritim artık çok güçlü.'
+          : 'This rhythm is very strong now.';
     }
     if (streak >= 7) {
-      return isTurkish
-          ? 'Artık bırakan biri değilsin.'
-          : 'You are no longer someone who quits.';
+      return isTurkish ? 'İstikrar kuruldu.' : 'Consistency is established.';
     }
     if (streak >= 3) {
-      return isTurkish ? 'Çoğu kişi burada bırakır.' : 'Most people stop here.';
+      return isTurkish ? 'İlerliyorsun.' : 'You are progressing.';
     }
     return isTurkish ? 'Başladın.' : 'You started.';
   }
 
   String comeBackMessage(int streak) {
     if (streak >= 7) {
-      return isTurkish ? 'Kaybetme.' : 'Don\'t lose it.';
+      return isTurkish ? 'Ritmi koru.' : 'Keep the rhythm.';
     }
 
     if (streak >= 3) {
-      return isTurkish ? 'Zinciri koru.' : 'Protect the chain.';
+      return isTurkish ? 'Devam et.' : 'Keep going.';
     }
 
     if (streak >= 1) {
@@ -410,14 +405,14 @@ class AppLocalizations {
 
   String streakMood(int streak) {
     if (isTurkish) {
-      if (streak >= 7) return 'Artık geri dönüş yok.';
-      if (streak >= 3) return 'Bırakanlar burada bırakır.';
+      if (streak >= 7) return 'İstikrar kuruldu.';
+      if (streak >= 3) return 'İyi gidiyorsun.';
       if (streak >= 1) return 'Başladın.';
       return 'Yeni başlangıç';
     }
 
-    if (streak >= 7) return 'No going back now.';
-    if (streak >= 3) return 'Most people stop here.';
+    if (streak >= 7) return 'Consistency is established.';
+    if (streak >= 3) return 'You are doing well.';
     if (streak >= 1) return 'You started.';
     return 'Fresh start';
   }

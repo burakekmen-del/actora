@@ -1,0 +1,20 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": [
+          "BNALHSF82C.com.hatirlatbana.invite"
+        ],
+        "components": [
+          {
+            "/": "/invite/*"
+          },
+          {
+            "/": "/r/*"
+          }
+        ]
+      }
+    ]
+  }
+}

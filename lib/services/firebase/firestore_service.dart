@@ -240,22 +240,32 @@ class FirestoreService {
   }
 
   Future<void> captureChallengeDeepLink(Uri uri) async {
-    final supportedScheme = uri.scheme == 'app' || uri.scheme == 'actora';
-    final isChallenge = supportedScheme &&
+    final isCustomScheme = uri.scheme == 'app' || uri.scheme == 'actora';
+    final isCustomChallenge = isCustomScheme &&
         uri.host == 'actora' &&
         uri.pathSegments.isNotEmpty &&
         uri.pathSegments.first == 'challenge';
-    if (!isChallenge) {
+    final isWebInvite = (uri.scheme == 'https' || uri.scheme == 'http') &&
+        uri.pathSegments.isNotEmpty &&
+        uri.pathSegments.first == 'invite';
+
+    if (!isCustomChallenge && !isWebInvite) {
       return;
     }
 
-    final fromUserId = uri.queryParameters['from'];
+    final fromUserId = uri.queryParameters['from'] ?? '';
     final streak = int.tryParse(uri.queryParameters['streak'] ?? '') ?? 0;
-    if (fromUserId == null || fromUserId.isEmpty) {
+    final inviteId = uri.queryParameters['invite_id'] ??
+        (uri.queryParameters['inviteId'] ??
+            (isWebInvite && uri.pathSegments.length > 1
+                ? uri.pathSegments[1]
+                : ''));
+    if (fromUserId.isEmpty && inviteId.isEmpty) {
       return;
     }
 
     final invite = ChallengeInvite(
+      inviteId: inviteId,
       fromUserId: fromUserId,
       streak: streak,
       receivedAt: DateTime.now(),
@@ -659,17 +669,20 @@ class WeeklyProgress {
 
 class ChallengeInvite {
   const ChallengeInvite({
+    required this.inviteId,
     required this.fromUserId,
     required this.streak,
     required this.receivedAt,
   });
 
+  final String inviteId;
   final String fromUserId;
   final int streak;
   final DateTime receivedAt;
 
   Map<String, dynamic> toMap() {
     return {
+      'inviteId': inviteId,
       'fromUserId': fromUserId,
       'streak': streak,
       'receivedAt': receivedAt.toIso8601String(),
@@ -678,6 +691,7 @@ class ChallengeInvite {
 
   factory ChallengeInvite.fromMap(Map<String, dynamic> map) {
     return ChallengeInvite(
+      inviteId: (map['inviteId'] as String?) ?? '',
       fromUserId: (map['fromUserId'] as String?) ?? '',
       streak: (map['streak'] as num?)?.toInt() ?? 0,
       receivedAt: DateTime.tryParse(map['receivedAt']?.toString() ?? '') ??

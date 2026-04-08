@@ -1,4 +1,4 @@
-package com.example.actora
+package com.hatirlatbana.invite
 
 import io.flutter.embedding.android.FlutterActivity
 
